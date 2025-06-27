@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
 import { MCPHttpServer } from './mcp-server';
 import { getVersion } from './version';
 
@@ -8,6 +8,9 @@ interface MCPPluginSettings {
 	httpsPort: number;
 	enableSSL: boolean;
 	debugLogging: boolean;
+	showConnectionStatus: boolean;
+	showProtocolInfo: boolean;
+	autoDetectPortConflicts: boolean;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -15,12 +18,18 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	httpPort: 3001,
 	httpsPort: 3002,
 	enableSSL: false,
-	debugLogging: false
+	debugLogging: false,
+	showConnectionStatus: true,
+	showProtocolInfo: false,
+	autoDetectPortConflicts: true
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
 	private mcpServer?: MCPHttpServer;
+	private currentVaultName: string = '';
+	private currentVaultPath: string = '';
+	private vaultSwitchTimeout?: number;
 
 	async onload() {
 		console.log(`🚀 Starting Obsidian MCP Plugin v${getVersion()}`);
@@ -28,6 +37,9 @@ export default class ObsidianMCPPlugin extends Plugin {
 		try {
 			await this.loadSettings();
 			console.log('✅ Settings loaded');
+
+			// Initialize vault context tracking
+			this.initializeVaultContext();
 
 			// Add settings tab
 			this.addSettingTab(new MCPSettingTab(this.app, this));
@@ -47,6 +59,9 @@ export default class ObsidianMCPPlugin extends Plugin {
 			});
 			console.log('✅ Command added');
 
+			// Setup vault monitoring
+			this.setupVaultMonitoring();
+
 			// Start MCP server if enabled
 			if (this.settings.httpEnabled) {
 				await this.startMCPServer();
@@ -65,18 +80,39 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 	async onunload() {
 		console.log('👋 Unloading Obsidian MCP Plugin');
+		
+		// Clear vault monitoring
+		if (this.vaultSwitchTimeout) {
+			clearTimeout(this.vaultSwitchTimeout);
+		}
+		
 		await this.stopMCPServer();
 	}
 
 	private async startMCPServer(): Promise<void> {
 		try {
+			// Check for port conflicts if enabled
+			if (this.settings.autoDetectPortConflicts) {
+				const conflict = await this.checkPortConflict(this.settings.httpPort);
+				if (conflict) {
+					const suggestedPort = await this.findAvailablePort(this.settings.httpPort);
+					new Notice(`Port ${this.settings.httpPort} is in use. Try port ${suggestedPort}`);
+					this.updateStatusBar();
+					return;
+				}
+			}
+
 			console.log(`🚀 Starting MCP server on port ${this.settings.httpPort}...`);
 			this.mcpServer = new MCPHttpServer(this.app, this.settings.httpPort);
 			await this.mcpServer.start();
 			this.updateStatusBar();
 			console.log('✅ MCP server started successfully');
+			if (this.settings.showConnectionStatus) {
+				new Notice(`MCP server started on port ${this.settings.httpPort}`);
+			}
 		} catch (error) {
 			console.error('❌ Failed to start MCP server:', error);
+			new Notice(`Failed to start MCP server: ${error}`);
 			this.updateStatusBar();
 		}
 	}
@@ -91,15 +127,29 @@ export default class ObsidianMCPPlugin extends Plugin {
 		}
 	}
 
-	private updateStatusBar(): void {
-		const statusBarItemEl = this.addStatusBarItem();
+	private statusBarItem?: HTMLElement;
+
+	updateStatusBar(): void {
+		if (this.statusBarItem) {
+			this.statusBarItem.remove();
+		}
+		
+		if (!this.settings.showConnectionStatus) {
+			return;
+		}
+
+		this.statusBarItem = this.addStatusBarItem();
 		
 		if (!this.settings.httpEnabled) {
-			statusBarItemEl.setText('MCP: Disabled');
+			this.statusBarItem.setText('MCP: Disabled');
+			this.statusBarItem.setAttribute('style', 'color: var(--text-muted);');
 		} else if (this.mcpServer?.isServerRunning()) {
-			statusBarItemEl.setText(`MCP: :${this.settings.httpPort}`);
+			const vaultName = this.app.vault.getName();
+			this.statusBarItem.setText(`MCP: ${vaultName}:${this.settings.httpPort}`);
+			this.statusBarItem.setAttribute('style', 'color: var(--text-success);');
 		} else {
-			statusBarItemEl.setText('MCP: Error');
+			this.statusBarItem.setText('MCP: Error');
+			this.statusBarItem.setAttribute('style', 'color: var(--text-error);');
 		}
 	}
 
@@ -109,6 +159,146 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	private async checkPortConflict(port: number): Promise<boolean> {
+		try {
+			// Try to create a temporary server to test port availability
+			const testServer = require('http').createServer();
+			return new Promise((resolve) => {
+				testServer.listen(port, '127.0.0.1', () => {
+					testServer.close(() => resolve(false)); // Port is available
+				});
+				testServer.on('error', () => resolve(true)); // Port is in use
+			});
+		} catch (error) {
+			return false; // Assume available if we can't test
+		}
+	}
+
+	private async findAvailablePort(startPort: number): Promise<number> {
+		for (let port = startPort + 1; port <= startPort + 100; port++) {
+			const inUse = await this.checkPortConflict(port);
+			if (!inUse) {
+				return port;
+			}
+		}
+		return startPort + 1; // Fallback
+	}
+
+	getMCPServerInfo(): any {
+		if (!this.mcpServer) return null;
+		
+		return {
+			version: getVersion(),
+			running: this.mcpServer.isServerRunning(),
+			port: this.settings.httpPort,
+			vaultName: this.app.vault.getName(),
+			vaultPath: this.getVaultPath(),
+			toolsCount: 5, // Our 5 semantic tools
+			resourcesCount: 1, // vault-info resource
+			connections: this.mcpServer.getConnectionCount() || 0
+		};
+	}
+
+	private initializeVaultContext(): void {
+		this.currentVaultName = this.app.vault.getName();
+		this.currentVaultPath = this.getVaultPath();
+		console.log(`📁 Initial vault context: ${this.currentVaultName} at ${this.currentVaultPath}`);
+	}
+
+	private getVaultPath(): string {
+		try {
+			// Try to get the vault path from the adapter
+			return (this.app.vault.adapter as any).basePath || '';
+		} catch (error) {
+			return '';
+		}
+	}
+
+	private setupVaultMonitoring(): void {
+		// Monitor layout changes which might indicate vault context changes
+		this.registerEvent(
+			this.app.workspace.on('layout-change', () => {
+				this.checkVaultContext();
+			})
+		);
+
+		// Monitor file operations that can help detect vault changes
+		this.registerEvent(
+			this.app.vault.on('create', () => {
+				this.checkVaultContext();
+			})
+		);
+
+		// Also monitor on active leaf changes
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				this.checkVaultContext();
+			})
+		);
+
+		// Periodic check as fallback (every 30 seconds)
+		this.registerInterval(
+			window.setInterval(() => {
+				this.checkVaultContext();
+			}, 30000)
+		);
+	}
+
+	private checkVaultContext(): void {
+		const newVaultName = this.app.vault.getName();
+		const newVaultPath = this.getVaultPath();
+
+		// Check if vault has changed (name or path)
+		if (newVaultName !== this.currentVaultName || 
+			(newVaultPath && newVaultPath !== this.currentVaultPath)) {
+			
+			this.handleVaultSwitch(
+				this.currentVaultName, 
+				newVaultName, 
+				this.currentVaultPath, 
+				newVaultPath
+			);
+		}
+	}
+
+	private async handleVaultSwitch(
+		oldVaultName: string, 
+		newVaultName: string, 
+		oldVaultPath: string, 
+		newVaultPath: string
+	): Promise<void> {
+		console.log(`🔄 Vault switch detected: ${oldVaultName} → ${newVaultName}`);
+		console.log(`📁 Path change: ${oldVaultPath} → ${newVaultPath}`);
+
+		// Update current context
+		this.currentVaultName = newVaultName;
+		this.currentVaultPath = newVaultPath;
+
+		// Show notification if enabled
+		if (this.settings.showConnectionStatus) {
+			new Notice(`MCP Plugin: Switched to vault "${newVaultName}"`);
+		}
+
+		// Restart MCP server to use new vault context
+		if (this.settings.httpEnabled && this.mcpServer?.isServerRunning()) {
+			console.log('🔄 Restarting MCP server for new vault context...');
+			
+			// Use a small delay to avoid rapid restarts
+			if (this.vaultSwitchTimeout) {
+				clearTimeout(this.vaultSwitchTimeout);
+			}
+			
+			this.vaultSwitchTimeout = setTimeout(async () => {
+				await this.stopMCPServer();
+				await this.startMCPServer();
+				console.log(`✅ MCP server restarted for vault: ${newVaultName}`);
+			}, 1000); // 1 second delay
+		}
+
+		// Update status bar to reflect new vault
+		this.updateStatusBar();
 	}
 }
 
@@ -127,6 +317,58 @@ class MCPSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', {text: 'Obsidian MCP Plugin Settings'});
 
+		// Connection Status Section
+		this.createConnectionStatusSection(containerEl);
+		
+		// Server Configuration Section
+		this.createServerConfigSection(containerEl);
+		
+		// UI Options Section
+		this.createUIOptionsSection(containerEl);
+		
+		// Protocol Information Section (if enabled)
+		if (this.plugin.settings.showProtocolInfo) {
+			this.createProtocolInfoSection(containerEl);
+		}
+	}
+
+	private createConnectionStatusSection(containerEl: HTMLElement): void {
+		const statusEl = containerEl.createDiv('mcp-status-section');
+		statusEl.createEl('h3', {text: 'Connection Status'});
+		
+		const info = this.plugin.getMCPServerInfo();
+		if (info) {
+			const statusGrid = statusEl.createDiv('mcp-status-grid');
+			statusGrid.style.display = 'grid';
+			statusGrid.style.gridTemplateColumns = '1fr 1fr';
+			statusGrid.style.gap = '10px';
+			statusGrid.style.margin = '10px 0';
+			
+			const createStatusItem = (label: string, value: string, color?: string) => {
+				const item = statusGrid.createDiv();
+				item.createEl('strong', {text: `${label}: `});
+				const valueEl = item.createSpan({text: value});
+				if (color) valueEl.style.color = color;
+			};
+			
+			createStatusItem('Status', info.running ? 'Running' : 'Stopped', 
+				info.running ? 'var(--text-success)' : 'var(--text-error)');
+			createStatusItem('Port', info.port.toString());
+			createStatusItem('Vault', info.vaultName);
+			if (info.vaultPath) {
+				createStatusItem('Path', info.vaultPath.length > 50 ? '...' + info.vaultPath.slice(-47) : info.vaultPath);
+			}
+			createStatusItem('Version', info.version);
+			createStatusItem('Tools', info.toolsCount.toString());
+			createStatusItem('Connections', info.connections.toString());
+		} else {
+			statusEl.createDiv({text: 'Server not running', cls: 'mcp-status-offline'});
+		}
+	}
+
+	private createServerConfigSection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', {text: 'Server Configuration'});
+
 		new Setting(containerEl)
 			.setName('Enable HTTP Server')
 			.setDesc('Enable the HTTP server for MCP access (requires restart)')
@@ -137,7 +379,7 @@ class MCPSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		new Setting(containerEl)
+		const portSetting = new Setting(containerEl)
 			.setName('HTTP Port')
 			.setDesc('Port for HTTP MCP server (default: 3001)')
 			.addText(text => text
@@ -148,7 +390,47 @@ class MCPSettingTab extends PluginSettingTab {
 					if (!isNaN(port) && port > 0 && port < 65536) {
 						this.plugin.settings.httpPort = port;
 						await this.plugin.saveSettings();
+						this.checkPortAvailability(port, portSetting);
 					}
+				}));
+		
+		// Check port availability on load
+		this.checkPortAvailability(this.plugin.settings.httpPort, portSetting);
+
+		new Setting(containerEl)
+			.setName('Auto-detect Port Conflicts')
+			.setDesc('Automatically detect and warn about port conflicts')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoDetectPortConflicts)
+				.onChange(async (value) => {
+					this.plugin.settings.autoDetectPortConflicts = value;
+					await this.plugin.saveSettings();
+				}));
+	}
+
+	private createUIOptionsSection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', {text: 'Interface Options'});
+
+		new Setting(containerEl)
+			.setName('Show Connection Status')
+			.setDesc('Show MCP server status in the status bar')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.showConnectionStatus)
+				.onChange(async (value) => {
+					this.plugin.settings.showConnectionStatus = value;
+					await this.plugin.saveSettings();
+					this.plugin.updateStatusBar();
+				}));
+
+		new Setting(containerEl)
+			.setName('Show Protocol Information')
+			.setDesc('Display detailed MCP protocol information in settings')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.showProtocolInfo)
+				.onChange(async (value) => {
+					this.plugin.settings.showProtocolInfo = value;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh to show/hide protocol info
 				}));
 
 		new Setting(containerEl)
@@ -160,5 +442,61 @@ class MCPSettingTab extends PluginSettingTab {
 					this.plugin.settings.debugLogging = value;
 					await this.plugin.saveSettings();
 				}));
+	}
+
+	private createProtocolInfoSection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', {text: 'MCP Protocol Information'});
+		
+		const info = containerEl.createDiv('mcp-protocol-info');
+		info.style.backgroundColor = 'var(--background-secondary)';
+		info.style.padding = '15px';
+		info.style.borderRadius = '5px';
+		info.style.marginTop = '10px';
+		
+		const toolsList = [
+			'🗂️ vault - File and folder operations with fragment support',
+			'✏️ edit - Smart editing with content buffers', 
+			'👁️ view - Content viewing and navigation',
+			'🔄 workflow - AI workflow guidance and suggestions',
+			'⚙️ system - System operations and web fetch'
+		];
+		
+		info.createEl('h4', {text: 'Available Tools (5)'});
+		const toolsListEl = info.createEl('ul');
+		toolsList.forEach(tool => {
+			toolsListEl.createEl('li', {text: tool});
+		});
+		
+		info.createEl('h4', {text: 'Available Resources (1)'});
+		const resourcesList = info.createEl('ul');
+		resourcesList.createEl('li', {text: '📊 obsidian://vault-info - Real-time vault metadata'});
+		
+		info.createEl('h4', {text: 'Claude Code Connection'});
+		const codeEl = info.createEl('code');
+		codeEl.style.display = 'block';
+		codeEl.style.padding = '10px';
+		codeEl.style.backgroundColor = 'var(--background-primary)';
+		codeEl.style.marginTop = '5px';
+		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
+	}
+
+	private async checkPortAvailability(port: number, setting: Setting): Promise<void> {
+		if (!this.plugin.settings.autoDetectPortConflicts) return;
+		
+		try {
+			const testServer = require('http').createServer();
+			testServer.listen(port, '127.0.0.1', () => {
+				testServer.close();
+				// Port is available - show success indicator
+				setting.setDesc(`Port for HTTP MCP server (default: 3001) ✅ Available`);
+			});
+			testServer.on('error', () => {
+				// Port is in use - show warning
+				setting.setDesc(`Port for HTTP MCP server (default: 3001) ⚠️ Port ${port} may be in use`);
+			});
+		} catch (error) {
+			// Can't test - neutral message
+			setting.setDesc('Port for HTTP MCP server (default: 3001)');
+		}
 	}
 }

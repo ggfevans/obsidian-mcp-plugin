@@ -2,7 +2,7 @@
 
 A semantic MCP (Model Context Protocol) server implemented as an Obsidian plugin, providing AI tools with direct access to your vault through HTTP transport with intelligent semantic operations.
 
-## 🎉 Current Status: v0.3.2 - Full Semantic Integration Complete!
+## 🎉 Current Status: v0.4.0 - Enhanced Plugin UI Complete!
 
 ✅ **Working HTTP MCP Transport** - Claude Code successfully connects  
 ✅ **5 Semantic Tools Implemented** - vault, edit, view, workflow, system  
@@ -10,6 +10,8 @@ A semantic MCP (Model Context Protocol) server implemented as an Obsidian plugin
 ✅ **Fragment Retrieval System** - Advanced content indexing for large files  
 ✅ **Workflow Intelligence** - AI guidance and suggestions  
 ✅ **MCP Resources** - Real-time vault metadata via `obsidian://vault-info`  
+✅ **Enhanced Plugin UI** - Port collision detection, multi-vault support, protocol dashboard  
+✅ **Real-time Status Indicators** - Connection monitoring with vault context awareness  
 
 ## Quick Start
 
@@ -267,7 +269,26 @@ class ObsidianAPI {
 - 🔧 **Integration**: AI tools adopting the plugin for Obsidian access
 - 📖 **Documentation**: Clear migration path from existing setups
 
-## Testing Results (v0.3.2)
+## New in v0.4.0 - Enhanced Plugin UI
+
+### 🎛️ **Advanced Configuration Dashboard**
+- **Port Collision Detection**: Automatic detection and warnings for port conflicts
+- **Multi-Vault Support**: Seamless switching between vaults with automatic server restart
+- **Protocol Information Panel**: Detailed MCP tool and resource listings
+- **Real-time Connection Status**: Live monitoring of server status and active connections
+
+### 🔧 **Improved Settings Interface**
+- **Connection Status Section**: Live dashboard showing server status, vault info, and connection count
+- **Server Configuration**: Smart port management with availability checking
+- **Interface Options**: Granular control over status bar and protocol information display
+- **Dynamic Updates**: Settings changes reflected immediately in the interface
+
+### 📊 **Enhanced Status Bar**
+- **Vault-Aware Display**: Shows current vault name and port (e.g., "MCP: MyVault:3001")
+- **Color-Coded Status**: Green for running, red for errors, muted for disabled
+- **Toggle Control**: Can be disabled via settings for minimal interface
+
+## Testing Results (v0.3.2 Foundation + v0.4.0 Enhancements)
 
 ### ✅ **Fully Working Features**
 - **HTTP MCP Transport**: Claude Code connection successful

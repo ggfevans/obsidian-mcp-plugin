@@ -28,6 +28,7 @@ export class MCPHttpServer {
   private obsidianAPI: ObsidianAPI;
   private port: number;
   private isRunning: boolean = false;
+  private connectionCount: number = 0;
 
   constructor(obsidianApp: App, port: number = 3001) {
     this.obsidianApp = obsidianApp;
@@ -192,7 +193,8 @@ export class MCPHttpServer {
         const transport = this.transports.get(sessionId)!;
         transport.close();
         this.transports.delete(sessionId);
-        console.log(`🔚 Closed MCP session: ${sessionId}`);
+        this.connectionCount = Math.max(0, this.connectionCount - 1);
+        console.log(`🔚 Closed MCP session: ${sessionId} (Remaining: ${this.connectionCount})`);
         res.status(200).json({ message: 'Session closed' });
       } else {
         res.status(404).json({ error: 'Session not found' });
@@ -225,6 +227,8 @@ export class MCPHttpServer {
         
         // Store the transport for future requests
         this.transports.set(effectiveSessionId, transport);
+        this.connectionCount++;
+        console.log(`🔗 New MCP connection: ${effectiveSessionId} (Total: ${this.connectionCount})`);
         
         console.log(`🔗 Created new MCP session: ${effectiveSessionId}`);
       } else {
@@ -313,5 +317,9 @@ export class MCPHttpServer {
 
   isServerRunning(): boolean {
     return this.isRunning;
+  }
+
+  getConnectionCount(): number {
+    return this.connectionCount;
   }
 }
