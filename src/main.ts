@@ -219,10 +219,10 @@ export default class ObsidianMCPPlugin extends Plugin {
 			// Update status bar with latest info
 			this.updateStatusBar();
 			
-			// Refresh settings panel if it's currently open
+			// Update live stats in settings panel if it's open
 			const settingsTab = (this.app as any).setting?.activeTab;
 			if (settingsTab && settingsTab instanceof MCPSettingTab) {
-				settingsTab.display();
+				settingsTab.updateLiveStats();
 			}
 		}, 3000);
 	}
@@ -540,12 +540,13 @@ class MCPSettingTab extends PluginSettingTab {
 		resourcesList.createEl('li', {text: '📊 obsidian://vault-info - Real-time vault metadata'});
 		
 		info.createEl('h4', {text: 'Claude Code Connection'});
-		const codeEl = info.createEl('code');
+		const commandExample = info.createDiv('protocol-command-example');
+		const codeEl = commandExample.createEl('code');
 		codeEl.style.display = 'block';
 		codeEl.style.padding = '10px';
 		codeEl.style.backgroundColor = 'var(--background-primary)';
 		codeEl.style.marginTop = '5px';
-		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
+		codeEl.textContent = `claude --mcp http://localhost:${this.plugin.settings.httpPort}/mcp`;
 	}
 
 	private async checkPortAvailability(port: number, setting: Setting): Promise<void> {
@@ -583,6 +584,58 @@ class MCPSettingTab extends PluginSettingTab {
 			} else {
 				button.buttonEl.style.display = 'none';
 				setting.setDesc('Port for HTTP MCP server (default: 3001)');
+			}
+		}
+	}
+
+	updateLiveStats(): void {
+		// Update all dynamic elements in the settings panel without rebuilding
+		const info = this.plugin.getMCPServerInfo();
+		
+		// Update connection status grid
+		const connectionEl = document.querySelector('.mcp-status-grid');
+		if (connectionEl) {
+			const connectionItems = connectionEl.querySelectorAll('div');
+			for (let i = 0; i < connectionItems.length; i++) {
+				const item = connectionItems[i];
+				const text = item.textContent || '';
+				const valueSpan = item.querySelector('span');
+				
+				if (text.includes('Status:') && valueSpan) {
+					valueSpan.textContent = info.running ? 'Running' : 'Stopped';
+					valueSpan.style.color = info.running ? 'var(--text-success)' : 'var(--text-error)';
+				} else if (text.includes('Port:') && valueSpan) {
+					valueSpan.textContent = info.port.toString();
+				} else if (text.includes('Connections:') && valueSpan) {
+					valueSpan.textContent = info.connections.toString();
+				}
+			}
+		}
+		
+		// Update protocol information section
+		const protocolSection = document.querySelector('.protocol-command-example');
+		if (protocolSection) {
+			const codeBlock = protocolSection.querySelector('code');
+			if (codeBlock) {
+				codeBlock.textContent = `claude --mcp http://localhost:${info.port}/mcp`;
+			}
+		}
+		
+		// Update any other dynamic content areas that need live updates
+		const statusElements = document.querySelectorAll('[data-live-update]');
+		for (let i = 0; i < statusElements.length; i++) {
+			const el = statusElements[i];
+			const updateType = el.getAttribute('data-live-update');
+			switch (updateType) {
+				case 'server-status':
+					el.textContent = info.running ? 'Running' : 'Stopped';
+					break;
+				case 'connection-count':
+					el.textContent = info.connections.toString();
+					break;
+				case 'server-port':
+					el.textContent = info.port.toString();
+					break;
 			}
 		}
 	}
