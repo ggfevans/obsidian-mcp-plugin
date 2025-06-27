@@ -1,4 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { MCPHttpServer } from './mcp-server';
 
 interface MCPPluginSettings {
 	httpEnabled: boolean;
@@ -10,19 +11,20 @@ interface MCPPluginSettings {
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
 	httpEnabled: true,
-	httpPort: 27123,
-	httpsPort: 27124,
-	enableSSL: true,
+	httpPort: 3001,
+	httpsPort: 3002,
+	enableSSL: false,
 	debugLogging: false
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
+	private mcpServer?: MCPHttpServer;
 
 	async onload() {
 		await this.loadSettings();
 
-		console.log('Loading Obsidian MCP Plugin v0.1.0');
+		console.log('Loading Obsidian MCP Plugin v0.1.1');
 
 		// Add settings tab
 		this.addSettingTab(new MCPSettingTab(this.app, this));
@@ -37,16 +39,51 @@ export default class ObsidianMCPPlugin extends Plugin {
 			}
 		});
 
+		// Start MCP server if enabled
+		if (this.settings.httpEnabled) {
+			await this.startMCPServer();
+		}
+
 		// Add status bar item
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('MCP: Ready');
+		this.updateStatusBar();
 
 		console.log('Obsidian MCP Plugin loaded successfully');
 	}
 
-	onunload() {
+	async onunload() {
 		console.log('Unloading Obsidian MCP Plugin');
-		// TODO: Stop HTTP server
+		await this.stopMCPServer();
+	}
+
+	private async startMCPServer(): Promise<void> {
+		try {
+			this.mcpServer = new MCPHttpServer(this.app, this.settings.httpPort);
+			await this.mcpServer.start();
+			this.updateStatusBar();
+		} catch (error) {
+			console.error('Failed to start MCP server:', error);
+			this.updateStatusBar();
+		}
+	}
+
+	private async stopMCPServer(): Promise<void> {
+		if (this.mcpServer) {
+			await this.mcpServer.stop();
+			this.mcpServer = undefined;
+			this.updateStatusBar();
+		}
+	}
+
+	private updateStatusBar(): void {
+		const statusBarItemEl = this.addStatusBarItem();
+		
+		if (!this.settings.httpEnabled) {
+			statusBarItemEl.setText('MCP: Disabled');
+		} else if (this.mcpServer?.isServerRunning()) {
+			statusBarItemEl.setText(`MCP: :${this.settings.httpPort}`);
+		} else {
+			statusBarItemEl.setText('MCP: Error');
+		}
 	}
 
 	async loadSettings() {
@@ -85,9 +122,9 @@ class MCPSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('HTTP Port')
-			.setDesc('Port for HTTP server (default: 27123)')
+			.setDesc('Port for HTTP MCP server (default: 3001)')
 			.addText(text => text
-				.setPlaceholder('27123')
+				.setPlaceholder('3001')
 				.setValue(this.plugin.settings.httpPort.toString())
 				.onChange(async (value) => {
 					const port = parseInt(value);
@@ -99,9 +136,9 @@ class MCPSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('HTTPS Port')
-			.setDesc('Port for HTTPS server (default: 27124)')
+			.setDesc('Port for HTTPS MCP server (default: 3002)')
 			.addText(text => text
-				.setPlaceholder('27124')
+				.setPlaceholder('3002')
 				.setValue(this.plugin.settings.httpsPort.toString())
 				.onChange(async (value) => {
 					const port = parseInt(value);
