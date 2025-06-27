@@ -31,7 +31,7 @@ export class MCPHttpServer {
     this.mcpServer = new MCPServer(
       {
         name: 'obsidian-mcp-plugin',
-        version: '0.1.5'
+        version: '0.2.0'
       },
       {
         capabilities: {
@@ -95,7 +95,7 @@ export class MCPHttpServer {
 
 ✨ This confirms the HTTP MCP transport is working between Claude Code and the Obsidian plugin!
 
-🔧 Plugin version: 0.1.5
+🔧 Plugin version: 0.2.0
 🌐 Transport: HTTP MCP via Express.js + MCP SDK
 🎯 Status: Connected and operational`
             }
@@ -131,7 +131,7 @@ export class MCPHttpServer {
     this.app.get('/', (req, res) => {
       const response = {
         name: 'obsidian-mcp-plugin',
-        version: '0.1.5',
+        version: '0.2.0',
         status: 'running',
         vault: this.obsidianApp.vault.getName(),
         timestamp: new Date().toISOString()
@@ -141,65 +141,10 @@ export class MCPHttpServer {
       res.json(response);
     });
 
+
     // MCP protocol endpoint - using StreamableHTTPServerTransport
     this.app.post('/mcp', async (req, res) => {
-      try {
-        const request = req.body;
-        console.log('📨 MCP Request:', request.method, request.params);
-
-        // Get or create session ID
-        const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        let transport: StreamableHTTPServerTransport;
-        let effectiveSessionId = sessionId;
-
-        if (sessionId && this.transports.has(sessionId)) {
-          // Use existing transport for this session
-          transport = this.transports.get(sessionId)!;
-        } else if (!sessionId && isInitializeRequest(request)) {
-          // New initialization request - create new transport with session
-          effectiveSessionId = randomUUID();
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => effectiveSessionId!
-          });
-          
-          // Connect the MCP server to this transport
-          await this.mcpServer.connect(transport);
-          
-          // Store the transport for future requests
-          this.transports.set(effectiveSessionId, transport);
-          
-          console.log(`🔗 Created new MCP session: ${effectiveSessionId}`);
-        } else {
-          // Handle stateless requests or create temporary transport
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: undefined // Stateless mode
-          });
-          await this.mcpServer.connect(transport);
-        }
-
-        // Set session header if we have one
-        if (effectiveSessionId) {
-          res.setHeader('Mcp-Session-Id', effectiveSessionId);
-        }
-
-        // Handle the request using the transport
-        await transport.handleRequest(req, res, request);
-        
-        console.log('📤 MCP Response sent via transport');
-
-      } catch (error) {
-        console.error('❌ MCP request error:', error);
-        if (!res.headersSent) {
-          res.status(500).json({
-            jsonrpc: '2.0',
-            error: {
-              code: -32603,
-              message: 'Internal error: ' + (error instanceof Error ? error.message : 'Unknown error')
-            },
-            id: null
-          });
-        }
-      }
+      await this.handleMCPRequest(req, res);
     });
 
     // Handle session deletion
@@ -216,6 +161,66 @@ export class MCPHttpServer {
         res.status(404).json({ error: 'Session not found' });
       }
     });
+  }
+
+  private async handleMCPRequest(req: any, res: any): Promise<void> {
+    try {
+      const request = req.body;
+      console.log('📨 MCP Request:', request.method, request.params);
+
+      // Get or create session ID
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      let transport: StreamableHTTPServerTransport;
+      let effectiveSessionId = sessionId;
+
+      if (sessionId && this.transports.has(sessionId)) {
+        // Use existing transport for this session
+        transport = this.transports.get(sessionId)!;
+      } else if (!sessionId && isInitializeRequest(request)) {
+        // New initialization request - create new transport with session
+        effectiveSessionId = randomUUID();
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => effectiveSessionId!
+        });
+        
+        // Connect the MCP server to this transport
+        await this.mcpServer.connect(transport);
+        
+        // Store the transport for future requests
+        this.transports.set(effectiveSessionId, transport);
+        
+        console.log(`🔗 Created new MCP session: ${effectiveSessionId}`);
+      } else {
+        // Handle stateless requests or create temporary transport
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined // Stateless mode
+        });
+        await this.mcpServer.connect(transport);
+      }
+
+      // Set session header if we have one
+      if (effectiveSessionId) {
+        res.setHeader('Mcp-Session-Id', effectiveSessionId);
+      }
+
+      // Handle the request using the transport
+      await transport.handleRequest(req, res, request);
+      
+      console.log('📤 MCP Response sent via transport');
+
+    } catch (error) {
+      console.error('❌ MCP request error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Internal error: ' + (error instanceof Error ? error.message : 'Unknown error')
+          },
+          id: null
+        });
+      }
+    }
   }
 
 

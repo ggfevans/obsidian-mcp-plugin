@@ -22,7 +22,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 	private mcpServer?: MCPHttpServer;
 
 	async onload() {
-		console.log('🚀 Starting Obsidian MCP Plugin v0.1.5');
+		console.log('🚀 Starting Obsidian MCP Plugin v0.2.0');
 		
 		try {
 			await this.loadSettings();
