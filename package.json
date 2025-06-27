@@ -1,6 +1,6 @@
 {
   "name": "obsidian-mcp-plugin",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Hybrid plugin combining Local REST API with semantic MCP server for enhanced AI tool integration",
   "main": "main.js",
   "scripts": {
