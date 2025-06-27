@@ -1,7 +1,7 @@
-import { ObsidianAPI } from '../utils/obsidian-api.js';
-import { findFuzzyMatches, extractContext } from '../utils/fuzzy-match.js';
-import { ContentBufferManager } from '../utils/content-buffer.js';
-import { isImageFile } from '../types/obsidian.js';
+import { ObsidianAPI } from '../utils/obsidian-api';
+import { findFuzzyMatches, extractContext } from '../utils/fuzzy-match';
+import { ContentBufferManager } from '../utils/content-buffer';
+import { isImageFile } from '../types/obsidian';
 
 // Shared edit logic to avoid circular references
 export async function performWindowEdit(

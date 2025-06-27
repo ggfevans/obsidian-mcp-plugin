@@ -1,7 +1,7 @@
 import { App, TFile, TFolder, TAbstractFile, Vault, Workspace, Command } from 'obsidian';
-import { ObsidianConfig, ObsidianFile, ObsidianFileResponse } from '../types/obsidian.js';
-import { limitSearchResults, DEFAULT_LIMITER_CONFIG } from './response-limiter.js';
-import { isImageFile as checkIsImageFile, processImageResponse } from './image-handler.js';
+import { ObsidianConfig, ObsidianFile, ObsidianFileResponse } from '../types/obsidian';
+import { limitSearchResults, DEFAULT_LIMITER_CONFIG } from './response-limiter';
+import { isImageFile as checkIsImageFile, processImageResponse } from './image-handler';
 import { getVersion } from '../version';
 
 export class ObsidianAPI {

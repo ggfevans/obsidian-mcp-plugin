@@ -4,7 +4,7 @@ import {
   LocalFragment,
   ScoredFragment,
   TermStatistics
-} from '../types/fragment.js';
+} from '../types/fragment';
 
 /**
  * Adaptive text index with dynamic term frequency scoring

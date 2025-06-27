@@ -4,7 +4,7 @@ import {
   TokenPosition,
   ProcessedDocument,
   PositionCluster
-} from '../types/fragment.js';
+} from '../types/fragment';
 
 /**
  * Proximity-based fragment extraction

@@ -1,9 +1,4 @@
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Configuration for response limiting
@@ -15,32 +10,13 @@ export interface ResponseLimiterConfig {
 }
 
 /**
- * Load configuration from file or use defaults
- */
-function loadConfig(): ResponseLimiterConfig {
-  try {
-    const configPath = join(__dirname, '../config/response-limits.json');
-    const configContent = readFileSync(configPath, 'utf-8');
-    const config = JSON.parse(configContent);
-    return {
-      maxTokens: config.maxTokens || 20000,
-      contentPreviewLength: config.contentPreviewLength || 200,
-      includeContentHash: config.includeContentHash ?? true
-    };
-  } catch {
-    // Use defaults if config file not found
-    return {
-      maxTokens: 20000,
-      contentPreviewLength: 200,
-      includeContentHash: true
-    };
-  }
-}
-
-/**
  * Default configuration
  */
-export const DEFAULT_LIMITER_CONFIG: ResponseLimiterConfig = loadConfig();
+export const DEFAULT_LIMITER_CONFIG: ResponseLimiterConfig = {
+  maxTokens: 20000,
+  contentPreviewLength: 200,
+  includeContentHash: true
+};
 
 /**
  * Estimates token count for a string (rough approximation)

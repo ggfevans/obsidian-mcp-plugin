@@ -6,7 +6,7 @@ import {
   limitSearchResults,
   limitResponse,
   DEFAULT_LIMITER_CONFIG
-} from '../response-limiter.js';
+} from '../response-limiter';
 
 describe('Response Limiter', () => {
   describe('estimateTokens', () => {

@@ -1,7 +1,7 @@
-import { ObsidianAPI } from '../utils/obsidian-api.js';
-import { SemanticRouter } from '../semantic/router.js';
-import { SemanticRequest } from '../types/semantic.js';
-import { isImageFile } from '../types/obsidian.js';
+import { ObsidianAPI } from '../utils/obsidian-api';
+import { SemanticRouter } from '../semantic/router';
+import { SemanticRequest } from '../types/semantic';
+import { isImageFile } from '../types/obsidian';
 
 /**
  * Unified semantic tools that consolidate all operations into 5 main verbs

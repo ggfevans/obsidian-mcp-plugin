@@ -1,22 +1,17 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { ObsidianAPI } from '../utils/obsidian-api.js';
+import { ObsidianAPI } from '../utils/obsidian-api';
 import { 
   SemanticResponse, 
   WorkflowConfig, 
   SemanticContext,
   SemanticRequest,
   SuggestedAction
-} from '../types/semantic.js';
-import { ContentBufferManager } from '../utils/content-buffer.js';
-import { StateTokenManager } from './state-tokens.js';
-import { limitResponse } from '../utils/response-limiter.js';
-import { isImageFile } from '../types/obsidian.js';
-import { UniversalFragmentRetriever } from '../indexing/fragment-retriever.js';
-import { readFileWithFragments } from '../utils/file-reader.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+} from '../types/semantic';
+import { ContentBufferManager } from '../utils/content-buffer';
+import { StateTokenManager } from './state-tokens';
+import { limitResponse } from '../utils/response-limiter';
+import { isImageFile } from '../types/obsidian';
+import { UniversalFragmentRetriever } from '../indexing/fragment-retriever';
+import { readFileWithFragments } from '../utils/file-reader';
 
 export class SemanticRouter {
   private config!: WorkflowConfig;
@@ -33,21 +28,8 @@ export class SemanticRouter {
   }
   
   private loadConfig() {
-    try {
-      const configPath = join(__dirname, '../config/workflows.json');
-      const configContent = readFileSync(configPath, 'utf-8');
-      this.config = JSON.parse(configContent);
-    } catch (error) {
-      // Try from current working directory for tests
-      try {
-        const configPath = join(process.cwd(), 'src/config/workflows.json');
-        const configContent = readFileSync(configPath, 'utf-8');
-        this.config = JSON.parse(configContent);
-      } catch {
-        console.warn('Failed to load config, using default');
-        this.config = this.getDefaultConfig();
-      }
-    }
+    // Use default configuration - in the future this could be loaded from Obsidian plugin settings
+    this.config = this.getDefaultConfig();
   }
   
   private getDefaultConfig(): WorkflowConfig {

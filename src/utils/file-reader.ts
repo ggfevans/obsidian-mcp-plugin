@@ -1,6 +1,6 @@
-import { ObsidianAPI } from './obsidian-api.js';
-import { isImageFile } from '../types/obsidian.js';
-import { UniversalFragmentRetriever } from '../indexing/fragment-retriever.js';
+import { ObsidianAPI } from './obsidian-api';
+import { isImageFile } from '../types/obsidian';
+import { UniversalFragmentRetriever } from '../indexing/fragment-retriever';
 
 interface FileReadOptions {
   path: string;

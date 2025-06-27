@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { App } from 'obsidian';
 import { createServer, Server } from 'http';
-import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp';
 import { 
   ListToolsRequestSchema,
   CallToolRequestSchema,
@@ -12,11 +12,11 @@ import {
   isInitializeRequest,
   type CallToolResult,
   type Tool
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/sdk/types';
 import { randomUUID } from 'crypto';
 import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
-import { semanticTools } from './tools/semantic-tools.js';
+import { semanticTools } from './tools/semantic-tools';
 
 
 export class MCPHttpServer {

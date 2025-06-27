@@ -1,8 +1,8 @@
-import { AdaptiveTextIndex } from './adaptive-index.js';
-import { ProximityFragmentIndex } from './proximity-index.js';
-import { SemanticChunkIndex } from './semantic-chunk-index.js';
-import { Fragment, RetrievalOptions } from '../types/fragment.js';
-import { SemanticResponse } from '../types/semantic.js';
+import { AdaptiveTextIndex } from './adaptive-index';
+import { ProximityFragmentIndex } from './proximity-index';
+import { SemanticChunkIndex } from './semantic-chunk-index';
+import { Fragment, RetrievalOptions } from '../types/fragment';
+import { SemanticResponse } from '../types/semantic';
 
 /**
  * Unified fragment retrieval system that automatically selects the best strategy

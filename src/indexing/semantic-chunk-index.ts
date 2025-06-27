@@ -4,7 +4,7 @@ import {
   ExpandedContext,
   SearchOptions,
   ContextualFragment
-} from '../types/fragment.js';
+} from '../types/fragment';
 
 /**
  * Semantic chunking with context preservation
