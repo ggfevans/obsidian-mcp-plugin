@@ -14,7 +14,15 @@ try {
   // Write updated manifest.json
   writeFileSync('manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 
-  console.log(`✅ Synced version ${version} from package.json to manifest.json`);
+  // Update version.ts
+  const versionTs = `// Version is injected at build time by sync-version.mjs
+export function getVersion(): string {
+  return '${version}';
+}
+`;
+  writeFileSync('src/version.ts', versionTs);
+
+  console.log(`✅ Synced version ${version} from package.json to manifest.json and version.ts`);
 } catch (error) {
   console.error('❌ Failed to sync version:', error.message);
   process.exit(1);
