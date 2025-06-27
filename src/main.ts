@@ -83,7 +83,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 		
 		// Clear vault monitoring
 		if (this.vaultSwitchTimeout) {
-			clearTimeout(this.vaultSwitchTimeout);
+			window.clearTimeout(this.vaultSwitchTimeout);
 		}
 		
 		await this.stopMCPServer();
@@ -287,10 +287,10 @@ export default class ObsidianMCPPlugin extends Plugin {
 			
 			// Use a small delay to avoid rapid restarts
 			if (this.vaultSwitchTimeout) {
-				clearTimeout(this.vaultSwitchTimeout);
+				window.clearTimeout(this.vaultSwitchTimeout);
 			}
 			
-			this.vaultSwitchTimeout = setTimeout(async () => {
+			this.vaultSwitchTimeout = window.setTimeout(async () => {
 				await this.stopMCPServer();
 				await this.startMCPServer();
 				console.log(`✅ MCP server restarted for vault: ${newVaultName}`);
