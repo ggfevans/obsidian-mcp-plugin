@@ -301,6 +301,7 @@ export class MCPHttpServer {
       console.log(`🔚 Closed MCP session on shutdown: ${sessionId}`);
     }
     this.transports.clear();
+    this.connectionCount = 0; // Reset connection count on server stop
 
     return new Promise<void>((resolve) => {
       this.server?.close(() => {
