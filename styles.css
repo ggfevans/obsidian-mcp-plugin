@@ -1,0 +1,31 @@
+/* Obsidian MCP Plugin Styles */
+
+.mcp-plugin-settings {
+    padding: 20px;
+}
+
+.mcp-plugin-settings h2 {
+    margin-bottom: 20px;
+    color: var(--text-accent);
+}
+
+.mcp-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.mcp-status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-success);
+}
+
+.mcp-status-indicator.error {
+    background-color: var(--text-error);
+}
+
+.mcp-status-indicator.warning {
+    background-color: var(--text-warning);
+}

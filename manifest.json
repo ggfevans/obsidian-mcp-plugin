@@ -1,0 +1,11 @@
+{
+  "id": "obsidian-mcp-plugin",
+  "name": "Obsidian MCP Plugin",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Hybrid plugin combining Local REST API with semantic MCP server for enhanced AI tool integration",
+  "author": "Aaron Blumenfeld",
+  "authorUrl": "https://github.com/aaronsb",
+  "fundingUrl": "https://github.com/sponsors/aaronsb",
+  "isDesktopOnly": false
+}
