@@ -1,5 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { BrowserMCPServer } from './browser-mcp-server';
+import { MCPHttpServer } from './mcp-server';
 
 interface MCPPluginSettings {
 	httpEnabled: boolean;
@@ -19,10 +19,10 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 
 export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
-	private mcpServer?: BrowserMCPServer;
+	private mcpServer?: MCPHttpServer;
 
 	async onload() {
-		console.log('🚀 Starting Obsidian MCP Plugin v0.1.4');
+		console.log('🚀 Starting Obsidian MCP Plugin v0.1.5');
 		
 		try {
 			await this.loadSettings();
@@ -70,7 +70,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 	private async startMCPServer(): Promise<void> {
 		try {
 			console.log(`🚀 Starting MCP server on port ${this.settings.httpPort}...`);
-			this.mcpServer = new BrowserMCPServer(this.app, this.settings.httpPort);
+			this.mcpServer = new MCPHttpServer(this.app, this.settings.httpPort);
 			await this.mcpServer.start();
 			this.updateStatusBar();
 			console.log('✅ MCP server started successfully');
