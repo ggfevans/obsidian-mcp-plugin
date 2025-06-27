@@ -1,6 +1,6 @@
 # Development Guide
 
-## v0.3.0 Status: Full Semantic MCP Integration Complete! 🎉
+## v0.3.2 Status: Full Semantic MCP Integration Complete! 🎉
 
 This plugin now provides a complete semantic MCP server with 5 intelligent tools and direct Obsidian API integration.
 

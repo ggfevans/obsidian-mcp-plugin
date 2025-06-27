@@ -1,7 +1,7 @@
 {
   "id": "obsidian-mcp-plugin",
   "name": "Obsidian MCP Plugin",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "minAppVersion": "0.15.0",
   "description": "Semantic MCP server plugin providing AI tools with direct Obsidian vault access via HTTP transport",
   "author": "Aaron Bockelie",

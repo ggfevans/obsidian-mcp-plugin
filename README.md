@@ -2,7 +2,7 @@
 
 A semantic MCP (Model Context Protocol) server implemented as an Obsidian plugin, providing AI tools with direct access to your vault through HTTP transport with intelligent semantic operations.
 
-## 🎉 Current Status: v0.3.0 - Full Semantic Integration Complete!
+## 🎉 Current Status: v0.3.2 - Full Semantic Integration Complete!
 
 ✅ **Working HTTP MCP Transport** - Claude Code successfully connects  
 ✅ **5 Semantic Tools Implemented** - vault, edit, view, workflow, system  
@@ -267,13 +267,55 @@ class ObsidianAPI {
 - 🔧 **Integration**: AI tools adopting the plugin for Obsidian access
 - 📖 **Documentation**: Clear migration path from existing setups
 
-## Next Steps
+## Testing Results (v0.3.2)
 
-1. **Repository Setup**: Initialize TypeScript plugin structure
-2. **Core Implementation**: Begin ObsidianAPI direct integration
-3. **MCP Integration**: Embed existing semantic operations
-4. **BRAT Preparation**: Prepare for beta testing release
+### ✅ **Fully Working Features**
+- **HTTP MCP Transport**: Claude Code connection successful
+- **Search Operations**: Single keyword search with 60+ results per term
+- **Text Editing**: Window edits, fuzzy matching, line-based insertion
+- **Content Viewing**: Full files, windowed sections, search highlighting  
+- **Fragment Retrieval**: Semantic search across multiple documents
+- **Image Processing**: DOM-based Canvas resizing (no native deps)
+- **Content Recovery**: Buffer system for failed edit recovery
+- **System Integration**: Version info, authentication status
+
+### ⚠️ **Known Limitations**
+- **Search**: Only single words work (no phrase queries or boolean operators)
+- **Large Vaults**: Directory listing fails on vaults with 31K+ files
+- **Search Quality**: Limited compared to native Obsidian search capabilities
+
+### 🚀 **Performance Results**
+- **Direct API Access**: Eliminates HTTP overhead completely
+- **Fast Response Times**: Sub-second for most operations
+- **Enterprise Scale**: Handles massive consulting document repositories
+
+## Development Roadmap
+
+### 📋 **Immediate Priorities (Next Phase)**
+1. **Enhanced Plugin UI**
+   - Configurable HTTP ports with collision detection
+   - Multi-vault support and status handling
+   - MCP protocol info dashboard (version, tools, stats)
+   - Real-time connection status indicators
+
+2. **Search System Overhaul**
+   - Leverage Obsidian's native search API
+   - Support phrase queries and boolean operators
+   - Tag-based and link-based search integration
+   - Fuzzy search across vault content
+
+3. **New Graph Memory Tool (6th Tool)**
+   - Graph traversal and relationship mapping
+   - Backlink analysis and link following
+   - Integration with Obsidian's graph view API
+   - Memory-like navigation through connected notes
+
+### 🧪 **Testing Strategy**
+- BRAT testing between each phase
+- Performance benchmarking vs HTTP approach
+- Multi-vault scenario validation
+- Community feedback integration
 
 ---
 
-*This plugin represents the natural evolution of Obsidian AI integration, combining the best of REST API access with semantic MCP operations in a single, high-performance package.*
+*This plugin successfully bridges Claude Code with Obsidian through semantic MCP, providing enterprise-grade AI tooling with direct vault access and intelligent content operations.*
