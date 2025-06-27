@@ -7,12 +7,16 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { 
   ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
   isInitializeRequest,
   type CallToolResult,
   type Tool
 } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'crypto';
 import { getVersion } from './version';
+import { ObsidianAPI } from './utils/obsidian-api';
+import { semanticTools } from './tools/semantic-tools.js';
 
 
 export class MCPHttpServer {
@@ -21,12 +25,16 @@ export class MCPHttpServer {
   private mcpServer: MCPServer;
   private transports: Map<string, StreamableHTTPServerTransport> = new Map();
   private obsidianApp: App;
+  private obsidianAPI: ObsidianAPI;
   private port: number;
   private isRunning: boolean = false;
 
   constructor(obsidianApp: App, port: number = 3001) {
     this.obsidianApp = obsidianApp;
     this.port = port;
+    
+    // Initialize ObsidianAPI with direct plugin access
+    this.obsidianAPI = new ObsidianAPI(obsidianApp);
     
     // Initialize MCP Server
     this.mcpServer = new MCPServer(
@@ -37,6 +45,7 @@ export class MCPHttpServer {
       {
         capabilities: {
           tools: {},
+          resources: {}
         }
       }
     );
@@ -48,63 +57,90 @@ export class MCPHttpServer {
   }
 
   private setupMCPHandlers(): void {
-    // Register the echo tool
+    // Register semantic tools following the proven pattern from obsidian-semantic-mcp
     this.mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        tools: [
-          {
-            name: 'echo',
-            description: 'Echo back the input message with Obsidian context',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                message: {
-                  type: 'string',
-                  description: 'Message to echo back'
-                }
-              },
-              required: ['message']
-            }
-          } as Tool
-        ]
+        tools: semanticTools.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema
+        }))
       };
     });
 
     // Handle tool calls
     this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
       const { name, arguments: args } = request.params;
+      
+      const tool = semanticTools.find(t => t.name === name);
+      if (!tool) {
+        throw new Error(`Tool not found: ${name}`);
+      }
+      
+      console.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}`);
+      
+      // Use the tool handler with our direct ObsidianAPI
+      return await tool.handler(this.obsidianAPI, args);
+    });
 
-      if (name === 'echo') {
-        const message = args?.message as string;
+    // Handle resource listing
+    this.mcpServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+      return {
+        resources: [
+          {
+            uri: 'obsidian://vault-info',
+            name: 'Vault Information',
+            description: 'Current vault status, file counts, and metadata',
+            mimeType: 'application/json'
+          }
+        ]
+      };
+    });
+
+    // Handle resource reading
+    this.mcpServer.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      
+      if (uri === 'obsidian://vault-info') {
         const vaultName = this.obsidianApp.vault.getName();
         const activeFile = this.obsidianApp.workspace.getActiveFile();
-        const fileCount = this.obsidianApp.vault.getAllLoadedFiles().length;
+        const allFiles = this.obsidianApp.vault.getAllLoadedFiles();
+        const markdownFiles = this.obsidianApp.vault.getMarkdownFiles();
         
-        console.log(`🔊 Echo tool called with message: "${message}"`);
-        
+        const vaultInfo = {
+          vault: {
+            name: vaultName,
+            path: (this.obsidianApp.vault.adapter as any).basePath || 'Unknown'
+          },
+          activeFile: activeFile ? {
+            name: activeFile.name,
+            path: activeFile.path,
+            basename: activeFile.basename,
+            extension: activeFile.extension
+          } : null,
+          files: {
+            total: allFiles.length,
+            markdown: markdownFiles.length,
+            attachments: allFiles.length - markdownFiles.length
+          },
+          plugin: {
+            version: getVersion(),
+            status: 'Connected and operational',
+            transport: 'HTTP MCP via Express.js + MCP SDK'
+          },
+          timestamp: new Date().toISOString()
+        };
+
         return {
-          content: [
-            {
-              type: 'text',
-              text: `🎉 Echo from Obsidian MCP Plugin!
-
-📝 Original message: ${message}
-📚 Vault name: ${vaultName}
-📄 Active file: ${activeFile?.name || 'None'}
-📊 Total files: ${fileCount}
-⏰ Timestamp: ${new Date().toISOString()}
-
-✨ This confirms the HTTP MCP transport is working between Claude Code and the Obsidian plugin!
-
-🔧 Plugin version: ${getVersion()}
-🌐 Transport: HTTP MCP via Express.js + MCP SDK
-🎯 Status: Connected and operational`
-            }
-          ]
+          contents: [{
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(vaultInfo, null, 2)
+          }]
         };
       }
-
-      throw new Error(`Unknown tool: ${name}`);
+      
+      throw new Error(`Resource not found: ${uri}`);
     });
   }
 
