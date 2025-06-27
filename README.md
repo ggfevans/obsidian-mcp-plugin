@@ -1,30 +1,43 @@
 # Obsidian MCP Plugin
 
-A hybrid Obsidian plugin that combines the functionality of the Local REST API plugin with an embedded MCP (Model Context Protocol) server, providing both HTTP REST endpoints and streamable MCP protocol access for AI tools.
+A semantic MCP (Model Context Protocol) server implemented as an Obsidian plugin, providing AI tools with direct access to your vault through HTTP transport with intelligent semantic operations.
 
 ## Architecture Overview
 
-This plugin is designed as a clean evolution of two existing projects:
-- **coddingtonbear/obsidian-local-rest-api**: Provides HTTP REST API access to Obsidian
-- **aaronsb/obsidian-semantic-mcp**: Provides semantic MCP operations with enhanced search, fragment retrieval, and AI-optimized workflows
+This plugin implements a semantic MCP server that runs natively within Obsidian, providing:
+- **Direct Obsidian API Integration**: No external HTTP calls - direct vault access for maximum performance
+- **Semantic Operations**: Enhanced search with content snippets, intelligent fragment retrieval, and contextual workflows
+- **HTTP MCP Transport**: Claude Code and other AI tools can connect via streamable HTTP MCP protocol
 
-### Key Innovation: Abstraction Layer Preservation
+### Key Innovation: ObsidianAPI Abstraction Layer
 
-The critical architectural decision is to **preserve the existing `ObsidianAPI` abstraction layer** while replacing its HTTP-based implementation with direct Obsidian plugin API calls. This allows us to:
+The critical architectural pattern is **preserving the existing `ObsidianAPI` abstraction layer** from our semantic MCP server while changing its implementation:
 
-1. **Reuse all existing MCP server logic** without modification
-2. **Maintain API compatibility** with existing integrations  
-3. **Improve performance** by eliminating HTTP overhead
-4. **Add new capabilities** only possible with direct plugin access
+**Before (External MCP Server):**
+```
+MCP Server → ObsidianAPI → HTTP calls → REST API Plugin → Obsidian App
+```
+
+**Now (Plugin-Integrated MCP Server):**
+```
+MCP Server → ObsidianAPI → Direct calls → Obsidian App
+```
+
+This allows us to:
+1. **Reuse all existing semantic MCP logic** without modification
+2. **Provide the same Obsidian tools** as the MCP+REST approach
+3. **Improve performance** by eliminating HTTP overhead  
+4. **Access the full Obsidian API** - not limited to what the REST API plugin exposes
+5. **Rich plugin ecosystem integration** - Dataview, Canvas, community plugins, etc.
 
 ## Goals & Requirements
 
 ### Primary Goals
 
-1. **Seamless Migration**: Drop-in replacement for separate REST API plugin + MCP server setup
-2. **Performance Enhancement**: Direct vault access instead of HTTP round-trips
-3. **Extended Capabilities**: Access to Obsidian internals not available via REST API
-4. **Dual Protocol Support**: Both HTTP REST and MCP protocols from single plugin
+1. **Native MCP Integration**: Run MCP server directly within Obsidian for optimal performance
+2. **Semantic Intelligence**: Provide enhanced search, fragment retrieval, and contextual operations
+3. **Direct Vault Access**: Eliminate HTTP overhead with direct Obsidian API integration
+4. **HTTP Transport**: Support Claude Code's streamable HTTP MCP transport
 5. **Community Ready**: Proper plugin structure for BRAT testing and official submission
 
 ### Technical Requirements

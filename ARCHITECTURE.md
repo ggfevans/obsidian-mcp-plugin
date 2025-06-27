@@ -2,7 +2,9 @@
 
 ## ObsidianAPI Abstraction Layer - The Critical Design Pattern
 
-The success of this hybrid plugin depends on preserving and enhancing the `ObsidianAPI` abstraction layer. This allows us to reuse all existing MCP server logic while gaining the performance benefits of direct plugin API access.
+The success of this architecture depends on preserving the exact `ObsidianAPI` abstraction layer from our semantic MCP server while changing only its underlying implementation. This allows us to reuse all existing semantic MCP logic while gaining the performance benefits and richer capabilities of direct plugin API access.
+
+**The key insight**: Keep the interface identical, change only the implementation target.
 
 ## Current vs. New Implementation
 
@@ -133,32 +135,79 @@ export class ObsidianAPI {
 4. **Enhanced Metadata**: Access to internal file properties and relationships
 5. **Memory Efficiency**: Shared memory space instead of separate processes
 
-## Enhanced Capabilities
+## Enhanced Capabilities - Beyond REST API Limitations
 
-### Obsidian-Native Features
+### Rich Obsidian API Access
 
-With direct plugin access, we can provide capabilities impossible via HTTP:
+The HTTP REST API plugin only exposes a subset of Obsidian's capabilities. With direct plugin access, we get the full API:
 
+**File System & Vault Operations:**
 ```typescript
-// Real-time file watching
+// Rich file metadata and relationships
+const file = this.app.vault.getAbstractFileByPath(path);
+const metadata = this.app.metadataCache.getFileCache(file);
+const backlinks = this.app.metadataCache.getBacklinksForFile(file);
+
+// Real-time file watching and change events
 this.app.vault.on('modify', (file) => {
-  this.notifyMCPClients('file-changed', { path: file.path });
+  this.notifyMCPClients('file-changed', { path: file.path, metadata });
 });
 
-// Access to internal search index
-const searchResults = this.app.internalPlugins.getPluginById('global-search')
-  ?.instance?.searchIndex?.search(query);
+// Canvas API access
+const canvasView = this.app.workspace.getActiveViewOfType(ItemView);
+if (canvasView?.getViewType() === 'canvas') {
+  const canvasData = canvasView.canvas.getData();
+  // Rich canvas manipulation and querying
+}
+```
 
-// Direct workspace manipulation
-this.app.workspace.openLinkText(linkText, sourcePath);
+**Workspace & UI Integration:**
+```typescript
+// Advanced workspace manipulation
+this.app.workspace.openLinkText(linkText, sourcePath, newLeaf);
+this.app.workspace.setActiveLeaf(leaf);
+this.app.workspace.revealActiveFile();
 
 // Plugin ecosystem integration
 const dataviewAPI = this.app.plugins.plugins['dataview']?.api;
-if (dataviewAPI) {
-  const pages = dataviewAPI.pages();
-  // Enhanced semantic operations with Dataview integration
-}
+const templaterAPI = this.app.plugins.plugins['templater-obsidian']?.templater;
+
+// Internal search and indexing
+const searchPlugin = this.app.internalPlugins.plugins['global-search'];
+const searchResults = searchPlugin?.instance?.searchIndex?.search(query);
 ```
+
+**Advanced Metadata & Links:**
+```typescript
+// Rich metadata extraction
+const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+const tags = this.app.metadataCache.getTags();
+const links = this.app.metadataCache.getLinks();
+
+// Graph analysis
+const resolvedLinks = this.app.metadataCache.resolvedLinks;
+const unresolvedLinks = this.app.metadataCache.unresolvedLinks;
+```
+
+**Community Plugin Integration:**
+```typescript
+// Dataview queries and data
+if (this.app.plugins.plugins['dataview']?.api) {
+  const dv = this.app.plugins.plugins['dataview'].api;
+  const pages = dv.pages().where(p => p.tags?.includes('#important'));
+}
+
+// Excalidraw drawings
+if (this.app.plugins.plugins['obsidian-excalidraw-plugin']) {
+  // Access and manipulate Excalidraw content
+}
+
+// Daily notes integration
+const dailyNotesPlugin = this.app.plugins.plugins['daily-notes'];
+const todaysNote = dailyNotesPlugin?.getTodaysNote();
+```
+
+This gives us semantic operations that are **impossible** with the REST API layer - rich metadata, real-time events, plugin ecosystem access, and advanced workspace manipulation.
 
 ### Enhanced Search Implementation
 

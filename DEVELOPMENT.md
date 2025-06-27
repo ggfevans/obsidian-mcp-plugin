@@ -59,6 +59,8 @@ This confirms the HTTP MCP transport is working between Claude Code and the Obsi
 
 ### Architecture Notes
 
+- **ObsidianAPI Layer**: Reuses the exact same abstraction layer from our semantic MCP server
+- **Implementation Change**: Instead of HTTP calls to REST API plugin, makes direct calls to Obsidian app
 - **Port Configuration**: Uses 3001/3002 by default (different from REST API plugin's 27123/27124)
 - **Protocol**: Implements HTTP MCP transport (not stdio)
 - **Endpoints**:
@@ -68,8 +70,8 @@ This confirms the HTTP MCP transport is working between Claude Code and the Obsi
 
 ### Next Steps
 
-Once the echo tool is working, we can implement:
-- Full vault operations (read, write, search)
-- Enhanced search with content snippets
-- Direct ObsidianAPI integration for performance
-- Complete MCP protocol compliance
+Once the echo tool is working, we can:
+1. **Port the ObsidianAPI implementation** from HTTP-based to direct app.vault/app.workspace calls
+2. **Import all semantic operations** from our existing MCP server (vault, edit, view, workflow, system)
+3. **Inherit enhanced search** with content snippets and media file discovery
+4. **Provide the same Obsidian tools** as the MCP+REST approach, but with enhanced performance and capabilities

@@ -20,7 +20,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
 
 	async onload() {
-		console.log('🚀 Starting Obsidian MCP Plugin v0.1.3');
+		console.log('🚀 Starting Obsidian MCP Plugin v0.1.2');
 		
 		try {
 			await this.loadSettings();
