@@ -1,4 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { BrowserMCPServer } from './browser-mcp-server';
 
 interface MCPPluginSettings {
 	httpEnabled: boolean;
@@ -18,9 +19,10 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 
 export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
+	private mcpServer?: BrowserMCPServer;
 
 	async onload() {
-		console.log('🚀 Starting Obsidian MCP Plugin v0.1.3');
+		console.log('🚀 Starting Obsidian MCP Plugin v0.1.4');
 		
 		try {
 			await this.loadSettings();
@@ -34,19 +36,23 @@ export default class ObsidianMCPPlugin extends Plugin {
 			this.addCommand({
 				id: 'restart-mcp-server',
 				name: 'Restart MCP Server',
-				callback: () => {
-					console.log('MCP Server restart requested');
+				callback: async () => {
+					console.log('🔄 MCP Server restart requested');
+					await this.stopMCPServer();
+					if (this.settings.httpEnabled) {
+						await this.startMCPServer();
+					}
 				}
 			});
 			console.log('✅ Command added');
 
-			// Add status bar item
-			const statusBarItemEl = this.addStatusBarItem();
+			// Start MCP server if enabled
 			if (this.settings.httpEnabled) {
-				statusBarItemEl.setText(`MCP: :${this.settings.httpPort}`);
-			} else {
-				statusBarItemEl.setText('MCP: Disabled');
+				await this.startMCPServer();
 			}
+
+			// Add status bar item
+			this.updateStatusBar();
 			console.log('✅ Status bar added');
 
 			console.log('🎉 Obsidian MCP Plugin loaded successfully');
@@ -58,6 +64,42 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 	async onunload() {
 		console.log('👋 Unloading Obsidian MCP Plugin');
+		await this.stopMCPServer();
+	}
+
+	private async startMCPServer(): Promise<void> {
+		try {
+			console.log(`🚀 Starting MCP server on port ${this.settings.httpPort}...`);
+			this.mcpServer = new BrowserMCPServer(this.app, this.settings.httpPort);
+			await this.mcpServer.start();
+			this.updateStatusBar();
+			console.log('✅ MCP server started successfully');
+		} catch (error) {
+			console.error('❌ Failed to start MCP server:', error);
+			this.updateStatusBar();
+		}
+	}
+
+	private async stopMCPServer(): Promise<void> {
+		if (this.mcpServer) {
+			console.log('🛑 Stopping MCP server...');
+			await this.mcpServer.stop();
+			this.mcpServer = undefined;
+			this.updateStatusBar();
+			console.log('✅ MCP server stopped');
+		}
+	}
+
+	private updateStatusBar(): void {
+		const statusBarItemEl = this.addStatusBarItem();
+		
+		if (!this.settings.httpEnabled) {
+			statusBarItemEl.setText('MCP: Disabled');
+		} else if (this.mcpServer?.isServerRunning()) {
+			statusBarItemEl.setText(`MCP: :${this.settings.httpPort}`);
+		} else {
+			statusBarItemEl.setText('MCP: Error');
+		}
 	}
 
 	async loadSettings() {
