@@ -2,6 +2,25 @@
 
 A semantic MCP (Model Context Protocol) server implemented as an Obsidian plugin, providing AI tools with direct access to your vault through HTTP transport with intelligent semantic operations.
 
+## 🎉 Current Status: v0.3.0 - Full Semantic Integration Complete!
+
+✅ **Working HTTP MCP Transport** - Claude Code successfully connects  
+✅ **5 Semantic Tools Implemented** - vault, edit, view, workflow, system  
+✅ **Direct Obsidian API Integration** - Maximum performance, no HTTP overhead  
+✅ **Fragment Retrieval System** - Advanced content indexing for large files  
+✅ **Workflow Intelligence** - AI guidance and suggestions  
+✅ **MCP Resources** - Real-time vault metadata via `obsidian://vault-info`  
+
+## Quick Start
+
+1. **Install via BRAT**: Add `aaronsb/obsidian-mcp-plugin` to BRAT
+2. **Enable HTTP Server**: Go to plugin settings → Enable HTTP Server
+3. **Connect Claude Code**: 
+   ```bash
+   claude mcp add obsidian http://localhost:3001/mcp --transport http
+   ```
+4. **Test Connection**: Use any semantic tool like `vault` with action `list`
+
 ## Architecture Overview
 
 This plugin implements a semantic MCP server that runs natively within Obsidian, providing:
@@ -42,12 +61,53 @@ This allows us to:
 
 ### Technical Requirements
 
-#### Core Functionality Preservation
-- ✅ All existing REST API endpoints from coddingtonbear's plugin
-- ✅ All semantic MCP operations from our existing server
-- ✅ Enhanced search with content snippets and media file discovery
+## Semantic Tools Available
+
+The plugin provides 5 intelligent semantic tools, each with multiple actions:
+
+### 🗂️ `vault` - File and Folder Operations
+- **list** - List files and directories with optional filtering
+- **read** - Read file content with fragment support for large files
+- **create** - Create new files with automatic directory creation
+- **update** - Update existing file content
+- **delete** - Delete files and folders
+- **search** - Enhanced search with content snippets and relevance scoring
+- **fragments** - Advanced fragment retrieval for specific content sections
+
+### ✏️ `edit` - Smart Editing Operations  
+- **window** - Smart editing with automatic content buffering
+- **append** - Append content to files
+- **patch** - Intelligent patch operations with fuzzy matching
+- **at_line** - Edit content at specific line numbers
+- **from_buffer** - Recover and apply content from edit buffers
+
+### 👁️ `view` - Content Viewing and Navigation
+- **file** - View file content with metadata
+- **window** - View content windows with context
+- **active** - Get currently active file information
+- **open_in_obsidian** - Open files in Obsidian interface
+
+### 🔄 `workflow` - AI Workflow Guidance
+- **suggest** - Get contextual workflow suggestions and efficiency hints based on current vault state and operation history
+
+### ⚙️ `system` - System Operations
+- **info** - Get vault and plugin information
+- **commands** - List and execute Obsidian commands
+- **fetch_web** - Fetch and convert web content to markdown
+
+## MCP Resources
+
+- **`obsidian://vault-info`** - Real-time vault metadata including file counts, active file, plugin status, and timestamps
+
+## Technical Implementation Status
+
+#### Core Functionality ✅ COMPLETE
+- ✅ All semantic MCP operations integrated with direct API calls
+- ✅ Enhanced search with content snippets and media file discovery  
 - ✅ Fragment retrieval and intelligent content extraction
 - ✅ Workflow hints and contextual suggestions
+- ✅ HTTP MCP transport with session management
+- ✅ Direct Obsidian plugin API integration
 
 #### Architecture Requirements
 - ✅ Plugin-native implementation (no external processes)
