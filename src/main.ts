@@ -218,6 +218,12 @@ export default class ObsidianMCPPlugin extends Plugin {
 		this.statsUpdateInterval = window.setInterval(() => {
 			// Update status bar with latest info
 			this.updateStatusBar();
+			
+			// Refresh settings panel if it's currently open
+			const settingsTab = (this.app as any).setting?.activeTab;
+			if (settingsTab && settingsTab instanceof MCPSettingTab) {
+				settingsTab.display();
+			}
 		}, 3000);
 	}
 
