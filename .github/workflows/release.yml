@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint code
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test
+
       - name: Build plugin
         run: npm run build
 
@@ -47,58 +53,24 @@ jobs:
 
       - name: Create Release
         if: steps.check_tag.outputs.exists == 'false'
-        id: create_release
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          release_name: v${{ steps.version.outputs.version }}
-          body: |
-            ## ${{ steps.version.outputs.name }} v${{ steps.version.outputs.version }}
-            
-            Auto-generated release from main branch.
-            
-            ### Installation via BRAT
-            1. Install the BRAT plugin if you haven't already
-            2. Command palette → "BRAT: Add a beta plugin for testing"
-            3. Enter: `aaronsb/obsidian-mcp-plugin`
-            4. Enable the plugin in Community Plugins
-            
-            ### Changes
-            See commit history for detailed changes in this release.
-          draft: false
-          prerelease: true
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "${{ steps.version.outputs.name }} v${{ steps.version.outputs.version }}" \
+            --notes "## ${{ steps.version.outputs.name }} v${{ steps.version.outputs.version }}
 
-      - name: Upload main.js
-        if: steps.check_tag.outputs.exists == 'false'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./main.js
-          asset_name: main.js
-          asset_content_type: text/javascript
+          Auto-generated release from main branch.
 
-      - name: Upload manifest.json
-        if: steps.check_tag.outputs.exists == 'false'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./manifest.json
-          asset_name: manifest.json
-          asset_content_type: application/json
+          ### Installation via BRAT
+          1. Install the BRAT plugin if you haven't already
+          2. Command palette → \"BRAT: Add a beta plugin for testing\"
+          3. Enter: \`aaronsb/obsidian-mcp-plugin\`
+          4. Enable the plugin in Community Plugins
 
-      - name: Upload styles.css
-        if: steps.check_tag.outputs.exists == 'false'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./styles.css
-          asset_name: styles.css
-          asset_content_type: text/css
+          ### Changes
+          See commit history for detailed changes in this release." \
+            --prerelease \
+            main.js \
+            manifest.json \
+            styles.css

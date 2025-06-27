@@ -17,7 +17,8 @@
       "node_modules/@types"
     ],
     "types": [
-      "node"
+      "node",
+      "jest"
     ],
     "strict": true,
     "skipLibCheck": true,
