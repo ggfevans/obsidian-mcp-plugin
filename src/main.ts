@@ -408,28 +408,59 @@ class MCPSettingTab extends PluginSettingTab {
 		const portSetting = new Setting(containerEl)
 			.setName('HTTP Port')
 			.setDesc('Port for HTTP MCP server (default: 3001)')
-			.addText(text => text
-				.setPlaceholder('3001')
-				.setValue(this.plugin.settings.httpPort.toString())
-				.onChange(async (value) => {
-					const port = parseInt(value);
-					if (!isNaN(port) && port > 0 && port < 65536) {
-						const oldPort = this.plugin.settings.httpPort;
-						this.plugin.settings.httpPort = port;
-						await this.plugin.saveSettings();
-						
-						// Auto-restart server if port changed and server is running
-						if (oldPort !== port && this.plugin.mcpServer?.isServerRunning()) {
-							new Notice(`Restarting MCP server on port ${port}...`);
-							await this.plugin.stopMCPServer();
-							await this.plugin.startMCPServer();
-							// Refresh status after a short delay
-							setTimeout(() => this.refreshConnectionStatus(), 500);
+			.addText(text => {
+				let pendingPort = this.plugin.settings.httpPort;
+				let hasChanges = false;
+				
+				text.setPlaceholder('3001')
+					.setValue(this.plugin.settings.httpPort.toString())
+					.onChange((value) => {
+						const port = parseInt(value);
+						if (!isNaN(port) && port > 0 && port < 65536) {
+							pendingPort = port;
+							hasChanges = (port !== this.plugin.settings.httpPort);
+							
+							// Update button visibility and port validation
+							this.updatePortApplyButton(portSetting, hasChanges, pendingPort);
+							this.checkPortAvailability(port, portSetting);
+						} else {
+							hasChanges = false;
+							this.updatePortApplyButton(portSetting, false, pendingPort);
 						}
+					});
+				
+				return text;
+			})
+			.addButton(button => {
+				button.setButtonText('Apply')
+					.setClass('mod-cta')
+					.onClick(async () => {
+						const textComponent = portSetting.components.find(c => (c as any).inputEl) as any;
+						const newPort = parseInt(textComponent.inputEl.value);
 						
-						this.checkPortAvailability(port, portSetting);
-					}
-				}));
+						if (!isNaN(newPort) && newPort > 0 && newPort < 65536) {
+							const oldPort = this.plugin.settings.httpPort;
+							this.plugin.settings.httpPort = newPort;
+							await this.plugin.saveSettings();
+							
+							// Auto-restart server if port changed and server is running
+							if (oldPort !== newPort && this.plugin.mcpServer?.isServerRunning()) {
+								new Notice(`Restarting MCP server on port ${newPort}...`);
+								await this.plugin.stopMCPServer();
+								await this.plugin.startMCPServer();
+								setTimeout(() => this.refreshConnectionStatus(), 500);
+							}
+							
+							// Hide apply button
+							button.buttonEl.style.display = 'none';
+							portSetting.setDesc('Port for HTTP MCP server (default: 3001)');
+						}
+					});
+				
+				// Initially hide the apply button
+				button.buttonEl.style.display = 'none';
+				return button;
+			});
 		
 		// Check port availability on load
 		this.checkPortAvailability(this.plugin.settings.httpPort, portSetting);
@@ -541,5 +572,18 @@ class MCPSettingTab extends PluginSettingTab {
 		// Simply refresh the entire settings display to ensure accurate data
 		// This is more reliable than trying to manually update DOM elements
 		this.display();
+	}
+
+	private updatePortApplyButton(setting: Setting, hasChanges: boolean, pendingPort: number): void {
+		const button = setting.components.find(c => (c as any).buttonEl) as any;
+		if (button) {
+			if (hasChanges) {
+				button.buttonEl.style.display = '';
+				setting.setDesc(`Port for HTTP MCP server (default: 3001) - Click Apply to change to ${pendingPort}`);
+			} else {
+				button.buttonEl.style.display = 'none';
+				setting.setDesc('Port for HTTP MCP server (default: 3001)');
+			}
+		}
 	}
 }
