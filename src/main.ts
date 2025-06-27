@@ -22,7 +22,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		console.log('Loading Obsidian MCP Plugin v1.0.0');
+		console.log('Loading Obsidian MCP Plugin v0.1.0');
 
 		// Add settings tab
 		this.addSettingTab(new MCPSettingTab(this.app, this));
