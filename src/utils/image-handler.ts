@@ -1,5 +1,4 @@
 import path from 'path';
-import Pica from 'pica';
 
 export interface ImageFile {
   path: string;
@@ -23,8 +22,6 @@ export const IMAGE_PROCESSING_PRESETS: Record<string, ImageProcessingConfig> = {
   casual: { mode: 'casual', maxDimension: 2048, quality: 0.8 },
   aggressive: { mode: 'aggressive', maxDimension: 1024, quality: 0.6 }
 };
-
-const pica = new Pica();
 
 export function isImageFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
@@ -50,7 +47,7 @@ export function getMimeType(filePath: string): string {
 }
 
 /**
- * Process image using Pica (pure JavaScript, high-quality resizing)
+ * Process image using Obsidian's DOM APIs (Canvas-based resizing)
  */
 export async function processImageResponse(
   filePath: string, 
@@ -69,8 +66,8 @@ export async function processImageResponse(
   }
   
   try {
-    // Use Pica for image processing
-    const resizedBuffer = await resizeImageWithPica(buffer, config);
+    // Use Obsidian's DOM APIs for image processing
+    const resizedBuffer = await resizeImageWithCanvas(buffer, config);
     
     return {
       path: filePath,
@@ -79,7 +76,7 @@ export async function processImageResponse(
     };
   } catch (error) {
     // If processing fails, return original
-    console.warn('Failed to process image with Pica:', error);
+    console.warn('Failed to process image with Canvas:', error);
     return {
       path: filePath,
       mimeType: getMimeType(filePath),
@@ -89,96 +86,121 @@ export async function processImageResponse(
 }
 
 /**
- * Resize image using Pica (high-quality pure JavaScript resizing)
+ * Resize image using Canvas API (available in Obsidian's Electron environment)
  */
-async function resizeImageWithPica(
+async function resizeImageWithCanvas(
   buffer: Buffer, 
   config: ImageProcessingConfig
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    // Create image element
-    const img = new Image();
-    
-    img.onload = async () => {
-      try {
-        const { width: originalWidth, height: originalHeight } = img;
-        const maxDimension = config.maxDimension || 2048;
-        
-        // Check if resizing is needed
-        if (originalWidth <= maxDimension && originalHeight <= maxDimension) {
-          // No resizing needed
-          resolve(buffer);
-          return;
-        }
-        
-        // Calculate new dimensions while maintaining aspect ratio
-        let newWidth = originalWidth;
-        let newHeight = originalHeight;
-        
-        if (originalWidth > originalHeight) {
-          // Landscape orientation
-          if (originalWidth > maxDimension) {
-            newHeight = Math.round((originalHeight * maxDimension) / originalWidth);
-            newWidth = maxDimension;
-          }
-        } else {
-          // Portrait or square orientation
-          if (originalHeight > maxDimension) {
-            newWidth = Math.round((originalWidth * maxDimension) / originalHeight);
-            newHeight = maxDimension;
-          }
-        }
-        
-        // Create source canvas
-        const sourceCanvas = document.createElement('canvas');
-        const sourceCtx = sourceCanvas.getContext('2d');
-        
-        if (!sourceCtx) {
-          throw new Error('Failed to get source canvas context');
-        }
-        
-        sourceCanvas.width = originalWidth;
-        sourceCanvas.height = originalHeight;
-        sourceCtx.drawImage(img, 0, 0);
-        
-        // Create destination canvas
-        const destCanvas = document.createElement('canvas');
-        destCanvas.width = newWidth;
-        destCanvas.height = newHeight;
-        
-        // Use Pica to resize with high quality
-        await pica.resize(sourceCanvas, destCanvas, {
-          quality: 3 // Highest quality (0=fastest, 3=slowest/best)
-        });
-        
-        // Convert to buffer
-        destCanvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error('Failed to create blob from canvas'));
+    try {
+      // Create image element
+      const img = new Image();
+      
+      img.onload = () => {
+        try {
+          const { width: originalWidth, height: originalHeight } = img;
+          const maxDimension = config.maxDimension || 2048;
+          
+          // Check if resizing is needed
+          if (originalWidth <= maxDimension && originalHeight <= maxDimension) {
+            // No resizing needed, but convert to JPEG with quality
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              throw new Error('Failed to get canvas context');
+            }
+            
+            canvas.width = originalWidth;
+            canvas.height = originalHeight;
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob((blob) => {
+              if (!blob) {
+                reject(new Error('Failed to create blob from canvas'));
+                return;
+              }
+              
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (reader.result instanceof ArrayBuffer) {
+                  resolve(Buffer.from(reader.result));
+                } else {
+                  reject(new Error('Unexpected FileReader result type'));
+                }
+              };
+              reader.onerror = () => reject(new Error('Failed to read blob'));
+              reader.readAsArrayBuffer(blob);
+            }, 'image/jpeg', config.quality || 0.8);
+            
             return;
           }
           
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (reader.result instanceof ArrayBuffer) {
-              resolve(Buffer.from(reader.result));
-            } else {
-              reject(new Error('Unexpected FileReader result type'));
+          // Calculate new dimensions while maintaining aspect ratio
+          let newWidth = originalWidth;
+          let newHeight = originalHeight;
+          
+          if (originalWidth > originalHeight) {
+            // Landscape orientation
+            if (originalWidth > maxDimension) {
+              newHeight = Math.round((originalHeight * maxDimension) / originalWidth);
+              newWidth = maxDimension;
             }
-          };
-          reader.onerror = () => reject(new Error('Failed to read blob'));
-          reader.readAsArrayBuffer(blob);
-        }, 'image/jpeg', config.quality || 0.8);
-        
-      } catch (error) {
-        reject(error);
-      }
-    };
-    
-    img.onerror = () => reject(new Error('Failed to load image'));
-    
-    // Create blob URL from buffer
-    const blob = new Blob([buffer]);
-    img.src = URL.createObjectURL(blob);
+          } else {
+            // Portrait or square orientation
+            if (originalHeight > maxDimension) {
+              newWidth = Math.round((originalWidth * maxDimension) / originalHeight);
+              newHeight = maxDimension;
+            }
+          }
+          
+          // Create canvas for resizing
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            throw new Error('Failed to get canvas context');
+          }
+          
+          canvas.width = newWidth;
+          canvas.height = newHeight;
+          
+          // Draw resized image
+          ctx.drawImage(img, 0, 0, newWidth, newHeight);
+          
+          // Convert to buffer
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              reject(new Error('Failed to create blob from canvas'));
+              return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (reader.result instanceof ArrayBuffer) {
+                resolve(Buffer.from(reader.result));
+              } else {
+                reject(new Error('Unexpected FileReader result type'));
+              }
+            };
+            reader.onerror = () => reject(new Error('Failed to read blob'));
+            reader.readAsArrayBuffer(blob);
+          }, 'image/jpeg', config.quality || 0.8);
+          
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      
+      // Create blob URL from buffer
+      const blob = new Blob([buffer]);
+      img.src = URL.createObjectURL(blob);
+      
+    } catch (error) {
+      reject(error);
+    }
   });
 }
