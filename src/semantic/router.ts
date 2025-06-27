@@ -120,10 +120,11 @@ export class SemanticRouter {
   
   private async executeVaultOperation(action: string, params: any): Promise<any> {
     switch (action) {
-      case 'list':
+      case 'list': {
         // Translate "/" to undefined for root directory
         const directory = params.directory === '/' ? undefined : params.directory;
         return await this.api.listFiles(directory);
+      }
       case 'read':
         return await readFileWithFragments(this.api, this.fragmentRetriever, {
           path: params.path,
@@ -132,7 +133,7 @@ export class SemanticRouter {
           strategy: params.strategy,
           maxFragments: params.maxFragments
         });
-      case 'fragments':
+      case 'fragments': {
         // Dedicated fragment search across multiple files
         // First, index all markdown files if not done
         if (this.fragmentRetriever.getIndexedDocumentCount() === 0) {
@@ -149,13 +150,14 @@ export class SemanticRouter {
         });
         
         return fragmentResponse;
+      }
       case 'create':
         return await this.api.createFile(params.path, params.content || '');
       case 'update':
         return await this.api.updateFile(params.path, params.content);
       case 'delete':
         return await this.api.deleteFile(params.path);
-      case 'search':
+      case 'search': {
         // Try both API search and filename search, then combine results
         let apiResults: any[] = [];
         let fallbackResults: any[] = [];
@@ -256,6 +258,7 @@ export class SemanticRouter {
           ...searchResults,
           workflow: this.getSearchWorkflowHints(searchResults.results)
         };
+      }
       default:
         throw new Error(`Unknown vault action: ${action}`);
     }
@@ -506,7 +509,7 @@ export class SemanticRouter {
     const buffer = ContentBufferManager.getInstance();
     
     switch (action) {
-      case 'window':
+      case 'window': {
         const result = await performWindowEdit(
           this.api,
           params.path,
@@ -518,6 +521,7 @@ export class SemanticRouter {
           throw new Error(result.content[0].text);
         }
         return result;
+      }
       case 'append':
         return await this.api.appendToFile(params.path, params.content);
       case 'patch':
@@ -527,7 +531,7 @@ export class SemanticRouter {
           target: params.target,
           content: params.content
         });
-      case 'at_line':
+      case 'at_line': {
         // Get content to insert
         let insertContent = params.content;
         if (!insertContent) {
@@ -567,7 +571,8 @@ export class SemanticRouter {
         
         await this.api.updateFile(params.path, lines.join('\n'));
         return { success: true, line: params.lineNumber, mode };
-      case 'from_buffer':
+      }
+      case 'from_buffer': {
         const buffered = buffer.retrieve();
         if (!buffered) {
           throw new Error('No buffered content available');
@@ -579,6 +584,7 @@ export class SemanticRouter {
           buffered.content,
           params.fuzzyThreshold
         );
+      }
       default:
         throw new Error(`Unknown edit action: ${action}`);
     }
@@ -588,7 +594,7 @@ export class SemanticRouter {
     switch (action) {
       case 'file':
         return await this.api.getFile(params.path);
-      case 'window':
+      case 'window': {
         // View a portion of a file
         const file = await this.api.getFile(params.path);
         if (isImageFile(file)) {
@@ -623,6 +629,7 @@ export class SemanticRouter {
           centerLine,
           searchText: params.searchText
         };
+      }
         
       case 'active':
         // Add timeout to prevent hanging when no file is active
@@ -666,10 +673,11 @@ export class SemanticRouter {
         return await this.api.getServerInfo();
       case 'commands':
         return await this.api.getCommands();
-      case 'fetch_web':
+      case 'fetch_web': {
         // Import fetch tool dynamically
         const { fetchTool } = await import('../tools/fetch.js');
         return await fetchTool.handler(this.api, params);
+      }
       default:
         throw new Error(`Unknown system action: ${action}`);
     }

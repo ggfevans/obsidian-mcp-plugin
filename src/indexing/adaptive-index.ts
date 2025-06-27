@@ -134,7 +134,7 @@ export class AdaptiveTextIndex {
     // Create overlapping windows of sentences
     for (let i = 0; i < sentences.length; i++) {
       let window = sentences[i].text;
-      let windowStart = sentences[i].start;
+      const windowStart = sentences[i].start;
       let j = i + 1;
       
       while (j < sentences.length && window.length < fragmentSize) {

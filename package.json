@@ -9,7 +9,8 @@
     "sync-version": "node sync-version.mjs",
     "version": "node sync-version.mjs && git add manifest.json",
     "test": "jest",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix"
   },
   "keywords": [
     "obsidian",
