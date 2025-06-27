@@ -12,6 +12,7 @@ import {
   type Tool
 } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'crypto';
+import { getVersion } from './version';
 
 
 export class MCPHttpServer {
@@ -31,7 +32,7 @@ export class MCPHttpServer {
     this.mcpServer = new MCPServer(
       {
         name: 'obsidian-mcp-plugin',
-        version: '0.2.0'
+        version: getVersion()
       },
       {
         capabilities: {
@@ -95,7 +96,7 @@ export class MCPHttpServer {
 
 ✨ This confirms the HTTP MCP transport is working between Claude Code and the Obsidian plugin!
 
-🔧 Plugin version: 0.2.0
+🔧 Plugin version: ${getVersion()}
 🌐 Transport: HTTP MCP via Express.js + MCP SDK
 🎯 Status: Connected and operational`
             }
@@ -131,7 +132,7 @@ export class MCPHttpServer {
     this.app.get('/', (req, res) => {
       const response = {
         name: 'obsidian-mcp-plugin',
-        version: '0.2.0',
+        version: getVersion(),
         status: 'running',
         vault: this.obsidianApp.vault.getName(),
         timestamp: new Date().toISOString()

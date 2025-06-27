@@ -1,5 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { MCPHttpServer } from './mcp-server';
+import { getVersion } from './version';
 
 interface MCPPluginSettings {
 	httpEnabled: boolean;
@@ -22,7 +23,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 	private mcpServer?: MCPHttpServer;
 
 	async onload() {
-		console.log('🚀 Starting Obsidian MCP Plugin v0.2.0');
+		console.log(`🚀 Starting Obsidian MCP Plugin v${getVersion()}`);
 		
 		try {
 			await this.loadSettings();
