@@ -26,10 +26,11 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 
 export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
-	private mcpServer?: MCPHttpServer;
+	mcpServer?: MCPHttpServer;
 	private currentVaultName: string = '';
 	private currentVaultPath: string = '';
 	private vaultSwitchTimeout?: number;
+	private statsUpdateInterval?: number;
 
 	async onload() {
 		console.log(`🚀 Starting Obsidian MCP Plugin v${getVersion()}`);
@@ -71,6 +72,9 @@ export default class ObsidianMCPPlugin extends Plugin {
 			this.updateStatusBar();
 			console.log('✅ Status bar added');
 
+			// Start stats update interval
+			this.startStatsUpdates();
+
 			console.log('🎉 Obsidian MCP Plugin loaded successfully');
 		} catch (error) {
 			console.error('❌ Error loading Obsidian MCP Plugin:', error);
@@ -86,15 +90,20 @@ export default class ObsidianMCPPlugin extends Plugin {
 			window.clearTimeout(this.vaultSwitchTimeout);
 		}
 		
+		// Clear stats updates
+		if (this.statsUpdateInterval) {
+			window.clearInterval(this.statsUpdateInterval);
+		}
+		
 		await this.stopMCPServer();
 	}
 
-	private async startMCPServer(): Promise<void> {
+	async startMCPServer(): Promise<void> {
 		try {
 			// Check for port conflicts if enabled
 			if (this.settings.autoDetectPortConflicts) {
-				const conflict = await this.checkPortConflict(this.settings.httpPort);
-				if (conflict) {
+				const status = await this.checkPortConflict(this.settings.httpPort);
+				if (status === 'in-use') {
 					const suggestedPort = await this.findAvailablePort(this.settings.httpPort);
 					new Notice(`Port ${this.settings.httpPort} is in use. Try port ${suggestedPort}`);
 					this.updateStatusBar();
@@ -117,7 +126,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 		}
 	}
 
-	private async stopMCPServer(): Promise<void> {
+	async stopMCPServer(): Promise<void> {
 		if (this.mcpServer) {
 			console.log('🛑 Stopping MCP server...');
 			await this.mcpServer.stop();
@@ -161,25 +170,30 @@ export default class ObsidianMCPPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	private async checkPortConflict(port: number): Promise<boolean> {
+	async checkPortConflict(port: number): Promise<'available' | 'this-server' | 'in-use'> {
 		try {
+			// Check if this is our own server
+			if (this.mcpServer?.isServerRunning() && this.settings.httpPort === port) {
+				return 'this-server';
+			}
+
 			// Try to create a temporary server to test port availability
 			const testServer = require('http').createServer();
 			return new Promise((resolve) => {
 				testServer.listen(port, '127.0.0.1', () => {
-					testServer.close(() => resolve(false)); // Port is available
+					testServer.close(() => resolve('available')); // Port is available
 				});
-				testServer.on('error', () => resolve(true)); // Port is in use
+				testServer.on('error', () => resolve('in-use')); // Port is in use
 			});
 		} catch (error) {
-			return false; // Assume available if we can't test
+			return 'available'; // Assume available if we can't test
 		}
 	}
 
 	private async findAvailablePort(startPort: number): Promise<number> {
 		for (let port = startPort + 1; port <= startPort + 100; port++) {
-			const inUse = await this.checkPortConflict(port);
-			if (!inUse) {
+			const status = await this.checkPortConflict(port);
+			if (status === 'available') {
 				return port;
 			}
 		}
@@ -199,6 +213,14 @@ export default class ObsidianMCPPlugin extends Plugin {
 			resourcesCount: 1, // vault-info resource
 			connections: this.mcpServer.getConnectionCount() || 0
 		};
+	}
+
+	private startStatsUpdates(): void {
+		// Update stats every 3 seconds
+		this.statsUpdateInterval = window.setInterval(() => {
+			// Update status bar with latest info
+			this.updateStatusBar();
+		}, 3000);
 	}
 
 	private initializeVaultContext(): void {
@@ -388,8 +410,19 @@ class MCPSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					const port = parseInt(value);
 					if (!isNaN(port) && port > 0 && port < 65536) {
+						const oldPort = this.plugin.settings.httpPort;
 						this.plugin.settings.httpPort = port;
 						await this.plugin.saveSettings();
+						
+						// Auto-restart server if port changed and server is running
+						if (oldPort !== port && this.plugin.mcpServer?.isServerRunning()) {
+							new Notice(`Restarting MCP server on port ${port}...`);
+							await this.plugin.stopMCPServer();
+							await this.plugin.startMCPServer();
+							// Refresh status after a short delay
+							setTimeout(() => this.refreshConnectionStatus(), 500);
+						}
+						
 						this.checkPortAvailability(port, portSetting);
 					}
 				}));
@@ -483,20 +516,26 @@ class MCPSettingTab extends PluginSettingTab {
 	private async checkPortAvailability(port: number, setting: Setting): Promise<void> {
 		if (!this.plugin.settings.autoDetectPortConflicts) return;
 		
-		try {
-			const testServer = require('http').createServer();
-			testServer.listen(port, '127.0.0.1', () => {
-				testServer.close();
-				// Port is available - show success indicator
+		const status = await this.plugin.checkPortConflict(port);
+		
+		switch (status) {
+			case 'available':
 				setting.setDesc(`Port for HTTP MCP server (default: 3001) ✅ Available`);
-			});
-			testServer.on('error', () => {
-				// Port is in use - show warning
-				setting.setDesc(`Port for HTTP MCP server (default: 3001) ⚠️ Port ${port} may be in use`);
-			});
-		} catch (error) {
-			// Can't test - neutral message
-			setting.setDesc('Port for HTTP MCP server (default: 3001)');
+				break;
+			case 'this-server':
+				setting.setDesc(`Port for HTTP MCP server (default: 3001) 🟢 This server`);
+				break;
+			case 'in-use':
+				setting.setDesc(`Port for HTTP MCP server (default: 3001) ⚠️ Port ${port} in use`);
+				break;
+			default:
+				setting.setDesc('Port for HTTP MCP server (default: 3001)');
 		}
+	}
+
+	refreshConnectionStatus(): void {
+		// Simply refresh the entire settings display to ensure accurate data
+		// This is more reliable than trying to manually update DOM elements
+		this.display();
 	}
 }
