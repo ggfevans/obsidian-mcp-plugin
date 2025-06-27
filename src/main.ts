@@ -112,7 +112,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 			}
 
 			console.log(`🚀 Starting MCP server on port ${this.settings.httpPort}...`);
-			this.mcpServer = new MCPHttpServer(this.app, this.settings.httpPort);
+			this.mcpServer = new MCPHttpServer(this.app, this.settings.httpPort, this);
 			await this.mcpServer.start();
 			this.updateStatusBar();
 			console.log('✅ MCP server started successfully');

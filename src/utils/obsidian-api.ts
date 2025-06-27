@@ -7,15 +7,17 @@ import { getVersion } from '../version';
 export class ObsidianAPI {
   private app: App;
   private config: ObsidianConfig;
+  private plugin?: any; // Reference to the plugin for accessing MCP server info
 
-  constructor(app: App, config?: ObsidianConfig) {
+  constructor(app: App, config?: ObsidianConfig, plugin?: any) {
     this.app = app;
     this.config = config || { apiKey: '', apiUrl: '' };
+    this.plugin = plugin;
   }
 
   // Server info
   async getServerInfo() {
-    return {
+    const baseInfo = {
       authenticated: true,
       cors: true,
       ok: true,
@@ -25,6 +27,21 @@ export class ObsidianAPI {
         'self': getVersion()
       }
     };
+
+    // Add MCP server connection info if plugin is available
+    if (this.plugin && this.plugin.mcpServer) {
+      return {
+        ...baseInfo,
+        mcp: {
+          running: this.plugin.mcpServer.isServerRunning(),
+          port: this.plugin.settings?.httpPort || 3001,
+          connections: this.plugin.mcpServer.getConnectionCount() || 0,
+          vault: this.app.vault.getName()
+        }
+      };
+    }
+
+    return baseInfo;
   }
 
   // Active file operations

@@ -29,13 +29,15 @@ export class MCPHttpServer {
   private port: number;
   private isRunning: boolean = false;
   private connectionCount: number = 0;
+  private plugin?: any; // Reference to the plugin
 
-  constructor(obsidianApp: App, port: number = 3001) {
+  constructor(obsidianApp: App, port: number = 3001, plugin?: any) {
     this.obsidianApp = obsidianApp;
     this.port = port;
+    this.plugin = plugin;
     
     // Initialize ObsidianAPI with direct plugin access
-    this.obsidianAPI = new ObsidianAPI(obsidianApp);
+    this.obsidianAPI = new ObsidianAPI(obsidianApp, undefined, plugin);
     
     // Initialize MCP Server
     this.mcpServer = new MCPServer(
