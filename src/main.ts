@@ -201,17 +201,18 @@ export default class ObsidianMCPPlugin extends Plugin {
 	}
 
 	getMCPServerInfo(): any {
-		if (!this.mcpServer) return null;
+		const connectionCount = this.mcpServer?.getConnectionCount() || 0;
+		console.log(`🔍 Debug: mcpServer exists: ${!!this.mcpServer}, connectionCount: ${connectionCount}`);
 		
 		return {
 			version: getVersion(),
-			running: this.mcpServer.isServerRunning(),
+			running: this.mcpServer?.isServerRunning() || false,
 			port: this.settings.httpPort,
 			vaultName: this.app.vault.getName(),
 			vaultPath: this.getVaultPath(),
 			toolsCount: 5, // Our 5 semantic tools
 			resourcesCount: 1, // vault-info resource
-			connections: this.mcpServer.getConnectionCount() || 0
+			connections: connectionCount
 		};
 	}
 
