@@ -105,6 +105,15 @@ export class SemanticRouter {
       case 'list': {
         // Translate "/" to undefined for root directory
         const directory = params.directory === '/' ? undefined : params.directory;
+        
+        // Use paginated list if page parameters are provided
+        if (params.page || params.pageSize) {
+          const page = parseInt(params.page) || 1;
+          const pageSize = parseInt(params.pageSize) || 20;
+          return await this.api.listFilesPaginated(directory, page, pageSize);
+        }
+        
+        // Fallback to simple list for backwards compatibility
         return await this.api.listFiles(directory);
       }
       case 'read':
@@ -140,106 +149,37 @@ export class SemanticRouter {
       case 'delete':
         return await this.api.deleteFile(params.path);
       case 'search': {
-        // Try both API search and filename search, then combine results
-        let apiResults: any[] = [];
-        let fallbackResults: any[] = [];
-        
-        // Try API search first
+        // Use advanced search with ranking and snippets
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const page = parseInt(params.page) || 1;
+          const pageSize = parseInt(params.pageSize) || 10;
+          const strategy = params.strategy || 'combined'; // filename, content, combined
+          const includeContent = params.includeContent !== false; // Default to true
           
-          const searchResults = await this.api.searchPaginated(params.query, params.page || 1, params.pageSize || 10);
-          clearTimeout(timeoutId);
-          
-          if (searchResults && searchResults.results) {
-            apiResults = searchResults.results;
-          }
-        } catch (apiError) {
-          console.warn('API search failed:', apiError);
-        }
-        
-        // Always also try filename-based search to find media files
-        try {
-          const fallbackSearch = await this.performFileBasedSearch(params.query, 1, 50, false); // No content search, just filenames
-          if (fallbackSearch && fallbackSearch.results) {
-            fallbackResults = fallbackSearch.results;
-          }
-        } catch (fallbackError) {
-          console.warn('Fallback search failed:', fallbackError);
-        }
-        
-        // Combine and deduplicate results
-        const combinedResults = this.combineSearchResults(apiResults, fallbackResults);
-        const totalResults = combinedResults.length;
-        const totalPages = Math.ceil(totalResults / (params.pageSize || 10));
-        const startIndex = ((params.page || 1) - 1) * (params.pageSize || 10);
-        const endIndex = startIndex + (params.pageSize || 10);
-        const paginatedResults = combinedResults.slice(startIndex, endIndex);
-        
-        const searchResults = {
-          query: params.query,
-          page: params.page || 1,
-          pageSize: params.pageSize || 10,
-          totalResults,
-          totalPages,
-          results: paginatedResults,
-          method: apiResults.length > 0 && fallbackResults.length > 0 ? 'combined' : 
-                  apiResults.length > 0 ? 'api' : 'fallback'
-        };
-        
-        // Enhance results with snippets by default (unless explicitly disabled)
-        if (params.includeContent !== false && searchResults.results && searchResults.results.length > 0) {
-          // Process each result to add content snippet
-          const enhancedResults = await Promise.all(
-            searchResults.results.map(async (result: any) => {
-              try {
-                // Skip non-markdown files
-                if (!result.path.endsWith('.md')) {
-                  return result;
-                }
-                
-                // Get the top fragment for this file using the search query
-                const fragmentResult = await readFileWithFragments(this.api, this.fragmentRetriever, {
-                  path: result.path,
-                  query: params.query,
-                  maxFragments: 1  // Only get the top fragment
-                });
-                
-                // Extract the first fragment if available
-                if (fragmentResult.content && Array.isArray(fragmentResult.content) && fragmentResult.content.length > 0) {
-                  const topFragment = fragmentResult.content[0];
-                  return {
-                    ...result,
-                    snippet: {
-                      content: topFragment.content,
-                      lineStart: topFragment.lineStart,
-                      lineEnd: topFragment.lineEnd,
-                      score: topFragment.score
-                    }
-                  };
-                }
-                
-                return result;
-              } catch (error) {
-                // If we can't get a snippet, return original result
-                console.warn(`Failed to get snippet for ${result.path}:`, error);
-                return result;
-              }
-            })
+          const searchResults = await this.api.searchPaginated(
+            params.query, 
+            page, 
+            pageSize, 
+            strategy,
+            includeContent
           );
           
+          return searchResults;
+        } catch (searchError) {
+          console.warn('Advanced search failed:', searchError);
+          
+          // Fallback to simple search
+          const fallbackResults = await this.api.searchSimple(params.query);
           return {
-            ...searchResults,
-            results: enhancedResults,
-            workflow: this.getSearchWorkflowHints(enhancedResults)
+            query: params.query,
+            page: 1,
+            pageSize: 10,
+            totalResults: Array.isArray(fallbackResults) ? fallbackResults.length : 0,
+            totalPages: 1,
+            results: Array.isArray(fallbackResults) ? fallbackResults.slice(0, 10) : [],
+            method: 'fallback'
           };
         }
-        
-        return {
-          ...searchResults,
-          workflow: this.getSearchWorkflowHints(searchResults.results)
-        };
       }
       default:
         throw new Error(`Unknown vault action: ${action}`);

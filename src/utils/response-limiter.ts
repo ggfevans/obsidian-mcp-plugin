@@ -201,3 +201,82 @@ function limitObjectResponse(obj: any, config: ResponseLimiterConfig): any {
   
   return limited;
 }
+
+/**
+ * Paginate array data with token limits
+ */
+export function paginateResults<T>(
+  data: T[],
+  page: number = 1,
+  pageSize: number = 10,
+  config: ResponseLimiterConfig = DEFAULT_LIMITER_CONFIG
+): {
+  results: T[];
+  page: number;
+  pageSize: number;
+  totalResults: number;
+  totalPages: number;
+  truncated?: boolean;
+  originalCount?: number;
+  message?: string;
+} {
+  // First limit results to prevent token overflow
+  const { results: limitedResults, truncated, originalCount } = limitSearchResults(data, config);
+  
+  const totalResults = limitedResults.length;
+  const totalPages = Math.ceil(totalResults / pageSize);
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  
+  const paginatedResults = limitedResults.slice(startIndex, endIndex);
+  
+  const response: any = {
+    results: paginatedResults,
+    page,
+    pageSize,
+    totalResults,
+    totalPages
+  };
+  
+  // Add truncation metadata if results were limited
+  if (truncated) {
+    response.truncated = true;
+    response.originalCount = originalCount;
+    response.message = `Results limited to prevent token overflow. Showing ${limitedResults.length} of ${originalCount} total results.`;
+  }
+  
+  return response;
+}
+
+/**
+ * Paginate file list with metadata
+ */
+export function paginateFiles(
+  files: any[],
+  page: number = 1,
+  pageSize: number = 20,
+  directory?: string
+): {
+  files: any[];
+  page: number;
+  pageSize: number;
+  totalFiles: number;
+  totalPages: number;
+  directory?: string;
+} {
+  const totalFiles = files.length;
+  const totalPages = Math.ceil(totalFiles / pageSize);
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  
+  const paginatedFiles = files.slice(startIndex, endIndex);
+  
+  return {
+    files: paginatedFiles,
+    page,
+    pageSize,
+    totalFiles,
+    totalPages,
+    ...(directory && { directory })
+  };
+}

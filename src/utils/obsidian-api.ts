@@ -1,18 +1,21 @@
 import { App, TFile, TFolder, TAbstractFile, Vault, Workspace, Command } from 'obsidian';
 import { ObsidianConfig, ObsidianFile, ObsidianFileResponse } from '../types/obsidian';
-import { limitSearchResults, DEFAULT_LIMITER_CONFIG } from './response-limiter';
+import { limitSearchResults, DEFAULT_LIMITER_CONFIG, paginateResults, paginateFiles } from './response-limiter';
 import { isImageFile as checkIsImageFile, processImageResponse } from './image-handler';
 import { getVersion } from '../version';
+import { AdvancedSearchService, SearchResult, SearchOptions } from './advanced-search';
 
 export class ObsidianAPI {
   private app: App;
   private config: ObsidianConfig;
   private plugin?: any; // Reference to the plugin for accessing MCP server info
+  private searchService: AdvancedSearchService;
 
   constructor(app: App, config?: ObsidianConfig, plugin?: any) {
     this.app = app;
     this.config = config || { apiKey: '', apiUrl: '' };
     this.plugin = plugin;
+    this.searchService = new AdvancedSearchService(app);
   }
 
   // Server info
@@ -122,6 +125,65 @@ export class ObsidianAPI {
       .filter(file => file instanceof TFile)
       .map(file => file.path)
       .sort();
+  }
+
+  async listFilesPaginated(
+    directory?: string, 
+    page: number = 1, 
+    pageSize: number = 20
+  ): Promise<{
+    files: Array<{
+      path: string;
+      name: string;
+      type: 'file' | 'folder';
+      size?: number;
+      extension?: string;
+      modified?: number;
+    }>;
+    page: number;
+    pageSize: number;
+    totalFiles: number;
+    totalPages: number;
+    directory?: string;
+  }> {
+    const vault = this.app.vault;
+    let files: TAbstractFile[];
+    
+    if (directory && directory !== '/') {
+      const folder = vault.getAbstractFileByPath(directory);
+      if (!folder || !(folder instanceof TFolder)) {
+        throw new Error(`Directory not found: ${directory}`);
+      }
+      files = folder.children;
+    } else {
+      files = vault.getAllLoadedFiles();
+    }
+
+    // Create detailed file objects
+    const fileObjects = files.map(file => {
+      const isFile = file instanceof TFile;
+      const result: any = {
+        path: file.path,
+        name: file.name,
+        type: isFile ? 'file' : 'folder'
+      };
+      
+      if (isFile) {
+        result.size = file.stat.size;
+        result.extension = file.extension;
+        result.modified = file.stat.mtime;
+      }
+      
+      return result;
+    }).sort((a, b) => {
+      // Sort folders first, then files, alphabetically
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return paginateFiles(fileObjects, page, pageSize, directory);
   }
 
   async getFile(path: string): Promise<ObsidianFileResponse> {
@@ -238,18 +300,62 @@ export class ObsidianAPI {
     return await this.fallbackSearch(query);
   }
 
-  async searchPaginated(query: string, page: number = 0, pageSize: number = 50) {
-    const allResults = await this.searchSimple(query);
-    const results = Array.isArray(allResults) ? allResults : allResults?.results || [];
-    const start = page * pageSize;
-    const end = start + pageSize;
+  async searchPaginated(
+    query: string, 
+    page: number = 1, 
+    pageSize: number = 10,
+    strategy: 'filename' | 'content' | 'combined' = 'combined',
+    includeContent: boolean = true
+  ): Promise<{
+    query: string;
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+    results: SearchResult[];
+    method: string;
+    truncated?: boolean;
+    originalCount?: number;
+    message?: string;
+  }> {
+    if (!query || query.trim().length === 0) {
+      return {
+        query,
+        page,
+        pageSize,
+        totalResults: 0,
+        totalPages: 0,
+        results: [],
+        method: 'advanced'
+      };
+    }
+
+    // Use advanced search service for ranking and snippets
+    const searchOptions: SearchOptions = {
+      strategy,
+      maxResults: 200, // Get more results for better pagination
+      snippetLength: includeContent ? 200 : 0,
+      includeMetadata: true
+    };
+
+    const allResults = await this.searchService.search(query, searchOptions);
+    
+    // Apply pagination with token limits
+    const paginatedResponse = paginateResults(allResults, page, pageSize);
     
     return {
-      results: results.slice(start, end),
-      page,
-      pageSize,
-      total: results.length,
-      hasMore: end < results.length
+      query,
+      page: paginatedResponse.page,
+      pageSize: paginatedResponse.pageSize,
+      totalResults: paginatedResponse.totalResults,
+      totalPages: paginatedResponse.totalPages,
+      results: paginatedResponse.results,
+      method: `advanced-${strategy}`,
+      ...(paginatedResponse.truncated && {
+        truncated: true,
+        originalCount: paginatedResponse.originalCount,
+        message: paginatedResponse.message
+      })
     };
   }
 
