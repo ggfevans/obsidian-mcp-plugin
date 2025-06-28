@@ -215,7 +215,7 @@ export class AdvancedSearchService {
     // Create overlapping windows of sentences/lines
     for (let i = 0; i < lines.length; i++) {
       let window = lines[i];
-      let windowStart = i;
+      const windowStart = i;
       let j = i + 1;
       
       // Extend window until we reach max length or end of file
