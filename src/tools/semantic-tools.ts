@@ -60,19 +60,72 @@ const createSemanticTool = (operation: string) => ({
       };
     }
     
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({
-          result: response.result,
-          workflow: response.workflow,
-          context: response.context,
-          efficiency_hints: response.efficiency_hints
-        }, null, 2)
-      }]
-    };
+    // Filter out image files from search results to prevent JSON serialization errors
+    let filteredResult = response.result;
+    if (operation === 'vault' && args.action === 'search' && response.result) {
+      filteredResult = filterImageFilesFromSearchResults(response.result);
+    }
+    
+    try {
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            result: filteredResult,
+            workflow: response.workflow,
+            context: response.context,
+            efficiency_hints: response.efficiency_hints
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      // Handle JSON serialization errors
+      console.error('JSON serialization failed:', error);
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Error: Unable to serialize response. ${error instanceof Error ? error.message : 'Unknown error'}`
+        }]
+      };
+    }
   }
 });
+
+function filterImageFilesFromSearchResults(searchResult: any): any {
+  if (!searchResult) return searchResult;
+  
+  // Handle paginated search results format
+  if (searchResult.results && Array.isArray(searchResult.results)) {
+    return {
+      ...searchResult,
+      results: searchResult.results.filter((result: any) => {
+        // Filter out results that reference image files
+        if (result.filename && isImageFile(result.filename)) {
+          return false;
+        }
+        if (result.path && isImageFile(result.path)) {
+          return false;
+        }
+        return true;
+      })
+    };
+  }
+  
+  // Handle simple search results format (array of results)
+  if (Array.isArray(searchResult)) {
+    return searchResult.filter((result: any) => {
+      if (result.filename && isImageFile(result.filename)) {
+        return false;
+      }
+      if (result.path && isImageFile(result.path)) {
+        return false;
+      }
+      return true;
+    });
+  }
+  
+  return searchResult;
+}
 
 function getOperationDescription(operation: string): string {
   const descriptions: Record<string, string> = {
