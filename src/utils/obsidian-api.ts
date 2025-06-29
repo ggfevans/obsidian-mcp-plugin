@@ -504,7 +504,7 @@ export class ObsidianAPI {
     };
 
     switch (searchTerm.type) {
-      case 'filename':
+      case 'filename': {
         // Support searching by extension (e.g., file:.png)
         const fileName = file.name.toLowerCase();
         const baseName = file.basename.toLowerCase();
@@ -523,6 +523,7 @@ export class ObsidianAPI {
           }
         }
         break;
+      }
         
       case 'path':
         if (file.path.toLowerCase().includes(termLower)) {
