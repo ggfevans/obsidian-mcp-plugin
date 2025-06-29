@@ -449,6 +449,8 @@ export class ObsidianAPI {
     originalQuery: string;
     isRegex?: boolean;
     regex?: RegExp;
+    isOr?: boolean;
+    orTerms?: string[];
   } {
     const trimmed = query.trim();
     
@@ -480,6 +482,12 @@ export class ObsidianAPI {
       return { type: 'tag', term: trimmed.substring(4).trim(), originalQuery: query };
     }
     
+    // Check for OR operator
+    if (trimmed.includes(' OR ')) {
+      const orTerms = trimmed.split(' OR ').map(t => t.trim());
+      return { type: 'general', term: trimmed, originalQuery: query, isOr: true, orTerms };
+    }
+    
     return { type: 'general', term: trimmed, originalQuery: query };
   }
 
@@ -488,7 +496,7 @@ export class ObsidianAPI {
    */
   private async checkFileMatch(
     file: TFile,
-    searchTerm: { type: string; term: string; originalQuery: string; isRegex?: boolean; regex?: RegExp },
+    searchTerm: { type: string; term: string; originalQuery: string; isRegex?: boolean; regex?: RegExp; isOr?: boolean; orTerms?: string[] },
     includeContent: boolean
   ): Promise<SearchResult | null> {
     const termLower = searchTerm.term.toLowerCase();
@@ -497,6 +505,12 @@ export class ObsidianAPI {
 
     // Helper function to check if text matches the search term
     const textMatches = (text: string): boolean => {
+      if (searchTerm.isOr && searchTerm.orTerms) {
+        // Check if any of the OR terms match
+        return searchTerm.orTerms.some(term => 
+          text.toLowerCase().includes(term.toLowerCase())
+        );
+      }
       if (searchTerm.isRegex && searchTerm.regex) {
         return searchTerm.regex.test(text);
       }
@@ -566,8 +580,8 @@ export class ObsidianAPI {
         break;
         
       case 'general':
-        // Check filename first
-        if (textMatches(file.basename)) {
+        // Check filename first (including extension for regex matching)
+        if (textMatches(file.name) || textMatches(file.basename)) {
           score = 1.5;
         }
         // Check content for text files
