@@ -1,7 +1,8 @@
 import { ObsidianAPI } from '../utils/obsidian-api';
 import { SemanticRouter } from '../semantic/router';
 import { SemanticRequest } from '../types/semantic';
-import { isImageFile } from '../types/obsidian';
+import { isImageFile } from '../utils/image-handler';
+import { isImageFile as isImageFileObject } from '../types/obsidian';
 
 /**
  * Unified semantic tools that consolidate all operations into 5 main verbs
@@ -49,7 +50,7 @@ const createSemanticTool = (operation: string) => ({
     }
     
     // Check if the result is an image file for vault read operations
-    if (operation === 'vault' && args.action === 'read' && response.result && isImageFile(response.result)) {
+    if (operation === 'vault' && args.action === 'read' && response.result && isImageFileObject(response.result)) {
       // Return image content for MCP
       return {
         content: [{
