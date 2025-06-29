@@ -447,8 +447,24 @@ export class ObsidianAPI {
     type: 'filename' | 'path' | 'content' | 'tag' | 'general';
     term: string;
     originalQuery: string;
+    isRegex?: boolean;
+    regex?: RegExp;
   } {
     const trimmed = query.trim();
+    
+    // Check for regex pattern /pattern/flags
+    if (trimmed.startsWith('/') && trimmed.lastIndexOf('/') > 0) {
+      const lastSlash = trimmed.lastIndexOf('/');
+      const pattern = trimmed.substring(1, lastSlash);
+      const flags = trimmed.substring(lastSlash + 1);
+      try {
+        const regex = new RegExp(pattern, flags);
+        return { type: 'general', term: pattern, originalQuery: query, isRegex: true, regex };
+      } catch (e) {
+        // Invalid regex, treat as normal search
+        console.warn('Invalid regex pattern:', e);
+      }
+    }
     
     // Check for operators
     if (trimmed.startsWith('file:')) {
@@ -472,17 +488,39 @@ export class ObsidianAPI {
    */
   private async checkFileMatch(
     file: TFile,
-    searchTerm: { type: string; term: string; originalQuery: string },
+    searchTerm: { type: string; term: string; originalQuery: string; isRegex?: boolean; regex?: RegExp },
     includeContent: boolean
   ): Promise<SearchResult | null> {
     const termLower = searchTerm.term.toLowerCase();
     let score = 0;
     let snippet = undefined;
 
+    // Helper function to check if text matches the search term
+    const textMatches = (text: string): boolean => {
+      if (searchTerm.isRegex && searchTerm.regex) {
+        return searchTerm.regex.test(text);
+      }
+      return text.toLowerCase().includes(termLower);
+    };
+
     switch (searchTerm.type) {
       case 'filename':
-        if (file.basename.toLowerCase().includes(termLower)) {
-          score = file.basename.toLowerCase() === termLower ? 2.0 : 1.0;
+        // Support searching by extension (e.g., file:.png)
+        const fileName = file.name.toLowerCase();
+        const baseName = file.basename.toLowerCase();
+        
+        if (termLower.startsWith('.')) {
+          // Extension search
+          if (fileName.endsWith(termLower)) {
+            score = 1.5;
+          }
+        } else {
+          // Regular filename search
+          if (baseName.includes(termLower)) {
+            score = baseName === termLower ? 2.0 : 1.0;
+          } else if (fileName.includes(termLower)) {
+            score = 0.8; // Lower score for extension matches
+          }
         }
         break;
         
@@ -528,14 +566,14 @@ export class ObsidianAPI {
         
       case 'general':
         // Check filename first
-        if (file.basename.toLowerCase().includes(termLower)) {
+        if (textMatches(file.basename)) {
           score = 1.5;
         }
         // Check content for text files
         if (this.isTextFile(file)) {
           try {
             const content = await this.app.vault.read(file);
-            if (content.toLowerCase().includes(termLower)) {
+            if (textMatches(content)) {
               score = Math.max(score, 1.0);
               if (includeContent) {
                 snippet = this.extractSnippet(content, searchTerm.term, 200);
