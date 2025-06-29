@@ -9,7 +9,6 @@ interface MCPPluginSettings {
 	enableSSL: boolean;
 	debugLogging: boolean;
 	showConnectionStatus: boolean;
-	showProtocolInfo: boolean;
 	autoDetectPortConflicts: boolean;
 }
 
@@ -20,7 +19,6 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	enableSSL: false,
 	debugLogging: false,
 	showConnectionStatus: true,
-	showProtocolInfo: false,
 	autoDetectPortConflicts: true
 };
 
@@ -352,10 +350,8 @@ class MCPSettingTab extends PluginSettingTab {
 		// UI Options Section
 		this.createUIOptionsSection(containerEl);
 		
-		// Protocol Information Section (if enabled)
-		if (this.plugin.settings.showProtocolInfo) {
-			this.createProtocolInfoSection(containerEl);
-		}
+		// Protocol Information Section (always show)
+		this.createProtocolInfoSection(containerEl);
 	}
 
 	private createConnectionStatusSection(containerEl: HTMLElement): void {
@@ -491,17 +487,6 @@ class MCPSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Show Protocol Information')
-			.setDesc('Display detailed MCP protocol information in settings')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.showProtocolInfo)
-				.onChange(async (value) => {
-					this.plugin.settings.showProtocolInfo = value;
-					await this.plugin.saveSettings();
-					this.display(); // Refresh to show/hide protocol info
-				}));
-
-		new Setting(containerEl)
 			.setName('Debug Logging')
 			.setDesc('Enable detailed debug logging in console')
 			.addToggle(toggle => toggle
@@ -546,7 +531,47 @@ class MCPSettingTab extends PluginSettingTab {
 		codeEl.style.padding = '10px';
 		codeEl.style.backgroundColor = 'var(--background-primary)';
 		codeEl.style.marginTop = '5px';
-		codeEl.textContent = `claude --mcp http://localhost:${this.plugin.settings.httpPort}/mcp`;
+		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
+		
+		info.createEl('h4', {text: 'Claude Desktop Configuration'});
+		const desktopDesc = info.createEl('p', {
+			text: 'Add this to your Claude Desktop configuration file:'
+		});
+		desktopDesc.style.marginBottom = '10px';
+		
+		const configExample = info.createDiv('desktop-config-example');
+		const configEl = configExample.createEl('pre');
+		configEl.style.display = 'block';
+		configEl.style.padding = '10px';
+		configEl.style.backgroundColor = 'var(--background-primary)';
+		configEl.style.marginTop = '5px';
+		configEl.style.overflowX = 'auto';
+		configEl.style.fontSize = '12px';
+		
+		const configJson = {
+			"mcpServers": {
+				"obsidian": {
+					"transport": {
+						"type": "http",
+						"url": `http://localhost:${this.plugin.settings.httpPort}/mcp`
+					}
+				}
+			}
+		};
+		
+		configEl.textContent = JSON.stringify(configJson, null, 2);
+		
+		const configPath = info.createEl('p', {
+			text: 'Configuration file location:'
+		});
+		configPath.style.marginTop = '10px';
+		configPath.style.fontSize = '12px';
+		
+		const pathList = configPath.createEl('ul');
+		pathList.style.fontSize = '12px';
+		pathList.createEl('li', {text: 'macOS: ~/Library/Application Support/Claude/claude_desktop_config.json'});
+		pathList.createEl('li', {text: 'Windows: %APPDATA%\\Claude\\claude_desktop_config.json'});
+		pathList.createEl('li', {text: 'Linux: ~/.config/Claude/claude_desktop_config.json'});
 	}
 
 	private async checkPortAvailability(port: number, setting: Setting): Promise<void> {
