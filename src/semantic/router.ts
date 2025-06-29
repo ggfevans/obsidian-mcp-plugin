@@ -166,18 +166,18 @@ export class SemanticRouter {
           
           return searchResults;
         } catch (searchError) {
-          console.warn('Advanced search failed:', searchError);
+          console.error('Search failed:', searchError);
           
-          // Fallback to simple search
-          const fallbackResults = await this.api.searchSimple(params.query);
+          // Return empty results if search completely fails
           return {
             query: params.query,
             page: 1,
             pageSize: 10,
-            totalResults: Array.isArray(fallbackResults) ? fallbackResults.length : 0,
-            totalPages: 1,
-            results: Array.isArray(fallbackResults) ? fallbackResults.slice(0, 10) : [],
-            method: 'fallback'
+            totalResults: 0,
+            totalPages: 0,
+            results: [],
+            method: 'error',
+            error: searchError.message
           };
         }
       }

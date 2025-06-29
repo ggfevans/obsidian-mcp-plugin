@@ -1,6 +1,6 @@
 import { App, TFile, TFolder, TAbstractFile, Vault, Workspace, Command } from 'obsidian';
 import { ObsidianConfig, ObsidianFile, ObsidianFileResponse } from '../types/obsidian';
-import { limitSearchResults, DEFAULT_LIMITER_CONFIG, paginateResults, paginateFiles } from './response-limiter';
+import { paginateResults, paginateFiles } from './response-limiter';
 import { isImageFile as checkIsImageFile, processImageResponse } from './image-handler';
 import { getVersion } from '../version';
 import { AdvancedSearchService, SearchResult, SearchOptions } from './advanced-search';
@@ -295,22 +295,6 @@ export class ObsidianAPI {
   }
 
   // Search operations
-  async searchSimple(query: string) {
-    try {
-      // Try to use Obsidian's search if available
-      const searchPlugin = (this.app as any).internalPlugins?.plugins?.['global-search'];
-      if (searchPlugin?.instance?.searchIndex) {
-        const searchResults = searchPlugin.instance.searchIndex.search(query);
-        if (searchResults) {
-          return limitSearchResults(searchResults, DEFAULT_LIMITER_CONFIG);
-        }
-      }
-    } catch (error) {
-      console.warn('Search plugin unavailable, using fallback:', error);
-    }
-
-    return await this.fallbackSearch(query);
-  }
 
   async searchPaginated(
     query: string, 
@@ -542,65 +526,4 @@ export class ObsidianAPI {
     }
   }
 
-  private async fallbackSearch(query: string) {
-    const files = this.app.vault.getFiles();
-    const results: any[] = [];
-    const queryLower = query.toLowerCase();
-
-    for (const file of files) {
-      // Check filename match first (works for all file types)
-      if (file.path.toLowerCase().includes(queryLower)) {
-        results.push({
-          filename: file.path,
-          matches: [{
-            line: `File: ${file.name}`,
-            lineNumber: 0
-          }]
-        });
-        continue;
-      }
-
-      // Only attempt content search for text files
-      if (!this.isTextFile(file)) {
-        continue;
-      }
-
-      try {
-        const content = await this.app.vault.read(file);
-        const contentLower = content.toLowerCase();
-        
-        if (contentLower.includes(queryLower)) {
-          // Find matching lines
-          const lines = content.split('\n');
-          const matchingLines = lines
-            .map((line, index) => ({ line, number: index + 1 }))
-            .filter(({ line }) => line.toLowerCase().includes(queryLower));
-
-          if (matchingLines.length > 0) {
-            results.push({
-              filename: file.path,
-              matches: matchingLines.map(({ line, number }) => ({
-                line,
-                lineNumber: number
-              }))
-            });
-          } else if (file.path.toLowerCase().includes(queryLower)) {
-            // File name match
-            results.push({
-              filename: file.path,
-              matches: [{
-                line: `File: ${file.name}`,
-                lineNumber: 0
-              }]
-            });
-          }
-        }
-      } catch (error) {
-        // Skip files that can't be read
-        continue;
-      }
-    }
-
-    return limitSearchResults(results, DEFAULT_LIMITER_CONFIG);
-  }
 }
