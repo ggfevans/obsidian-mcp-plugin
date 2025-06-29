@@ -406,7 +406,7 @@ export class ObsidianAPI {
   }
 
   private async fallbackSearch(query: string) {
-    const files = this.app.vault.getMarkdownFiles();
+    const files = this.app.vault.getFiles();
     const results: any[] = [];
     const queryLower = query.toLowerCase();
 

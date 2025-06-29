@@ -50,8 +50,8 @@ export class AdvancedSearchService {
     const normalizedQuery = this.normalizeQuery(query);
     const queryTokens = this.tokenize(normalizedQuery);
     
-    // Get all markdown files
-    const files = this.app.vault.getMarkdownFiles();
+    // Get all files in the vault
+    const files = this.app.vault.getFiles();
     const results: SearchResult[] = [];
     
     for (const file of files) {
