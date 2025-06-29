@@ -65,15 +65,17 @@ export async function processImageResponse(
     };
   }
   
+  const mimeType = getMimeType(filePath);
+  
   try {
     // Use Obsidian's DOM APIs for image processing
     console.log(`Processing image ${filePath} with config:`, config);
-    const resizedBuffer = await resizeImageWithCanvas(buffer, config);
+    const resizedBuffer = await resizeImageWithCanvas(buffer, mimeType, config);
     console.log(`Successfully resized image from ${buffer.length} to ${resizedBuffer.length} bytes`);
     
     return {
       path: filePath,
-      mimeType: getMimeType(filePath),
+      mimeType: mimeType,
       base64Data: resizedBuffer.toString('base64')
     };
   } catch (error) {
@@ -82,7 +84,7 @@ export async function processImageResponse(
     console.log(`Returning original image (${buffer.length} bytes)`);
     return {
       path: filePath,
-      mimeType: getMimeType(filePath),
+      mimeType: mimeType,
       base64Data: buffer.toString('base64')
     };
   }
@@ -92,7 +94,8 @@ export async function processImageResponse(
  * Resize image using Canvas API (available in Obsidian's Electron environment)
  */
 async function resizeImageWithCanvas(
-  buffer: Buffer, 
+  buffer: Buffer,
+  mimeType: string,
   config: ImageProcessingConfig
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -119,6 +122,10 @@ async function resizeImageWithCanvas(
             canvas.height = originalHeight;
             ctx.drawImage(img, 0, 0);
             
+            // Convert to blob with the original image type
+            const outputFormat = getMimeType(buffer.toString('base64', 0, 20)); // Check file signature
+            const useOriginalFormat = outputFormat.startsWith('image/');
+            
             canvas.toBlob((blob) => {
               if (!blob) {
                 reject(new Error('Failed to create blob from canvas'));
@@ -135,7 +142,7 @@ async function resizeImageWithCanvas(
               };
               reader.onerror = () => reject(new Error('Failed to read blob'));
               reader.readAsArrayBuffer(blob);
-            }, 'image/jpeg', config.quality || 0.8);
+            }, mimeType, mimeType === 'image/jpeg' ? (config.quality || 0.8) : undefined);
             
             return;
           }
@@ -189,7 +196,7 @@ async function resizeImageWithCanvas(
             };
             reader.onerror = () => reject(new Error('Failed to read blob'));
             reader.readAsArrayBuffer(blob);
-          }, 'image/jpeg', config.quality || 0.8);
+          }, mimeType, mimeType === 'image/jpeg' ? (config.quality || 0.8) : undefined);
           
         } catch (error) {
           reject(error);
