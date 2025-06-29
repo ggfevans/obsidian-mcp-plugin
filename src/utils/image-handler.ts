@@ -123,8 +123,6 @@ async function resizeImageWithCanvas(
             ctx.drawImage(img, 0, 0);
             
             // Convert to blob with the original image type
-            const outputFormat = getMimeType(buffer.toString('base64', 0, 20)); // Check file signature
-            const useOriginalFormat = outputFormat.startsWith('image/');
             
             canvas.toBlob((blob) => {
               if (!blob) {

@@ -192,7 +192,7 @@ export class ObsidianAPI {
     // Check if it's an image file
     if (checkIsImageFile(path)) {
       const arrayBuffer = await this.app.vault.readBinary(file);
-      return await processImageResponse(path, arrayBuffer, IMAGE_PROCESSING_PRESETS.casual);
+      return await processImageResponse(path, arrayBuffer, IMAGE_PROCESSING_PRESETS.none);
     }
 
     // Regular text file
