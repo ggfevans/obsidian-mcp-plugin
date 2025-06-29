@@ -177,7 +177,7 @@ export class SemanticRouter {
             totalPages: 0,
             results: [],
             method: 'error',
-            error: searchError.message
+            error: searchError instanceof Error ? searchError.message : String(searchError)
           };
         }
       }
