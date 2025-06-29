@@ -63,7 +63,7 @@ const createSemanticTool = (operation: string) => ({
     
     // Only filter image files if they contain binary data that would cause JSON errors
     // For search results, we want to show image files in the results list
-    let filteredResult = response.result;
+    const filteredResult = response.result;
     
     try {
       return {
