@@ -139,7 +139,7 @@ function filterImageFilesFromSearchResults(searchResult: any): any {
 
 function getOperationDescription(operation: string): string {
   const descriptions: Record<string, string> = {
-    vault: 'File and folder operations - list, read, create, update, delete, search. Search supports operators: file: (search by filename or extension, e.g. file:.png), path: (search in file path), content: (search in file content), tag: (search for tags). Regex patterns supported with /pattern/flags syntax (e.g. /\\.png$/i for case-insensitive PNG files). Without operators, searches both filename and content. Results are ranked by relevance.',
+    vault: 'File and folder operations - list, read, create, update, delete, search, fragments. Search supports operators: file: (search by filename or extension, e.g. file:.png), path: (search in file path), content: (search in file content), tag: (search for tags). OR operator for multiple terms (e.g. agile OR scrum). Quoted phrases for exact matches (e.g. "user story"). Regex patterns with /pattern/flags syntax (e.g. /\\.png$/i). Operators can be combined: "user story" OR "acceptance criteria". Without operators, searches both filename and content. Results are ranked by relevance.',
     edit: 'Smart editing operations - window (auto-buffers content), append, patch, at_line, from_buffer',
     view: 'Content viewing and navigation - file, window, active, open_in_obsidian',
     workflow: 'Workflow guidance and suggestions based on current context',
