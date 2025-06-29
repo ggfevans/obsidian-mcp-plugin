@@ -1,7 +1,7 @@
 import { App, TFile, TFolder, TAbstractFile, Vault, Workspace, Command } from 'obsidian';
 import { ObsidianConfig, ObsidianFile, ObsidianFileResponse } from '../types/obsidian';
 import { paginateResults, paginateFiles } from './response-limiter';
-import { isImageFile as checkIsImageFile, processImageResponse } from './image-handler';
+import { isImageFile as checkIsImageFile, processImageResponse, IMAGE_PROCESSING_PRESETS } from './image-handler';
 import { getVersion } from '../version';
 import { SearchResult } from './advanced-search';
 
@@ -192,7 +192,7 @@ export class ObsidianAPI {
     // Check if it's an image file
     if (checkIsImageFile(path)) {
       const arrayBuffer = await this.app.vault.readBinary(file);
-      return await processImageResponse(path, arrayBuffer);
+      return await processImageResponse(path, arrayBuffer, IMAGE_PROCESSING_PRESETS.casual);
     }
 
     // Regular text file

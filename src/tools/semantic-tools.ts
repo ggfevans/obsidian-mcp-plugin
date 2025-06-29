@@ -65,6 +65,17 @@ const createSemanticTool = (operation: string) => ({
     // For search results, we want to show image files in the results list
     const filteredResult = response.result;
     
+    // Special handling for image files in view operations
+    if (operation === 'view' && args.action === 'file' && filteredResult && filteredResult.base64Data) {
+      return {
+        content: [{
+          type: 'image' as const,
+          data: filteredResult.base64Data,
+          mimeType: filteredResult.mimeType
+        }]
+      };
+    }
+    
     try {
       return {
         content: [{
