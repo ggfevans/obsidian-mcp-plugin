@@ -100,10 +100,10 @@ function filterImageFilesFromSearchResults(searchResult: any): any {
       ...searchResult,
       results: searchResult.results.filter((result: any) => {
         // Filter out results that reference image files
-        if (result.filename && isImageFile(result.filename)) {
+        if (result.filename && typeof result.filename === 'string' && isImageFile(result.filename)) {
           return false;
         }
-        if (result.path && isImageFile(result.path)) {
+        if (result.path && typeof result.path === 'string' && isImageFile(result.path)) {
           return false;
         }
         return true;
@@ -114,10 +114,10 @@ function filterImageFilesFromSearchResults(searchResult: any): any {
   // Handle simple search results format (array of results)
   if (Array.isArray(searchResult)) {
     return searchResult.filter((result: any) => {
-      if (result.filename && isImageFile(result.filename)) {
+      if (result.filename && typeof result.filename === 'string' && isImageFile(result.filename)) {
         return false;
       }
-      if (result.path && isImageFile(result.path)) {
+      if (result.path && typeof result.path === 'string' && isImageFile(result.path)) {
         return false;
       }
       return true;
