@@ -3,6 +3,7 @@ import { SemanticRouter } from '../semantic/router';
 import { SemanticRequest } from '../types/semantic';
 import { isImageFile } from '../utils/image-handler';
 import { isImageFile as isImageFileObject } from '../types/obsidian';
+import { App } from 'obsidian';
 
 /**
  * Unified semantic tools that consolidate all operations into 5 main verbs
@@ -24,7 +25,8 @@ const createSemanticTool = (operation: string) => ({
     required: ['action']
   },
   handler: async (api: ObsidianAPI, args: any) => {
-    const router = new SemanticRouter(api);
+    const app = api.getApp();
+    const router = new SemanticRouter(api, app);
     
     const request: SemanticRequest = {
       operation,
@@ -143,7 +145,8 @@ function getOperationDescription(operation: string): string {
     edit: 'Smart editing operations - window (auto-buffers content), append, patch, at_line, from_buffer',
     view: 'Content viewing and navigation - file, window, active, open_in_obsidian',
     workflow: 'Workflow guidance and suggestions based on current context',
-    system: 'System operations - info, commands, fetch_web'
+    system: 'System operations - info, commands, fetch_web',
+    graph: 'Graph traversal and link analysis - traverse (explore connected nodes), neighbors (get immediate connections), path (find paths between nodes), statistics (get link counts), backlinks (incoming links), forwardlinks (outgoing links), search-traverse (search-based graph traversal returning snippet chains), advanced-traverse (multi-query search traversal with strategies)'
   };
   return descriptions[operation] || 'Unknown operation';
 }
@@ -154,7 +157,8 @@ function getActionsForOperation(operation: string): string[] {
     edit: ['window', 'append', 'patch', 'at_line', 'from_buffer'],
     view: ['file', 'window', 'active', 'open_in_obsidian'],
     workflow: ['suggest'],
-    system: ['info', 'commands', 'fetch_web']
+    system: ['info', 'commands', 'fetch_web'],
+    graph: ['traverse', 'neighbors', 'path', 'statistics', 'backlinks', 'forwardlinks', 'search-traverse', 'advanced-traverse']
   };
   return actions[operation] || [];
 }
@@ -281,17 +285,104 @@ function getParametersForOperation(operation: string): Record<string, any> {
         type: 'string',
         description: 'URL to fetch and convert to markdown'
       }
+    },
+    graph: {
+      sourcePath: {
+        type: 'string',
+        description: 'Starting file path for graph operations'
+      },
+      targetPath: {
+        type: 'string',
+        description: 'Target file path (for path finding operations)'
+      },
+      maxDepth: {
+        type: 'number',
+        description: 'Maximum depth for traversal (default: 3)'
+      },
+      maxNodes: {
+        type: 'number',
+        description: 'Maximum number of nodes to return (default: 50)'
+      },
+      includeUnresolved: {
+        type: 'boolean',
+        description: 'Include unresolved links in the results'
+      },
+      followBacklinks: {
+        type: 'boolean',
+        description: 'Follow backlinks during traversal (default: true)'
+      },
+      followForwardLinks: {
+        type: 'boolean',
+        description: 'Follow forward links during traversal (default: true)'
+      },
+      followTags: {
+        type: 'boolean',
+        description: 'Follow tag connections during traversal'
+      },
+      fileFilter: {
+        type: 'string',
+        description: 'Regex pattern to filter file names'
+      },
+      tagFilter: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Only include files with these tags'
+      },
+      folderFilter: {
+        type: 'string',
+        description: 'Only include files in this folder'
+      },
+      // Graph search traversal parameters
+      startPath: {
+        type: 'string',
+        description: 'Starting document path for search traversal'
+      },
+      searchQuery: {
+        type: 'string',
+        description: 'Search query to apply at each node (for search-traverse)'
+      },
+      searchQueries: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Multiple search queries (for advanced-traverse)'
+      },
+      maxSnippetsPerNode: {
+        type: 'number',
+        description: 'Maximum snippets to extract per node (default: 2)'
+      },
+      scoreThreshold: {
+        type: 'number',
+        description: 'Minimum score threshold for including nodes (0-1, default: 0.5)'
+      },
+      strategy: {
+        type: 'string',
+        enum: ['breadth-first', 'best-first', 'beam-search'],
+        description: 'Traversal strategy (for advanced-traverse)'
+      },
+      beamWidth: {
+        type: 'number',
+        description: 'Beam width for beam-search strategy'
+      },
+      includeOrphans: {
+        type: 'boolean',
+        description: 'Include orphaned notes in traversal'
+      },
+      filePattern: {
+        type: 'string',
+        description: 'Filter traversal to files matching this pattern'
+      }
     }
   };
   
   return operationParams[operation] || {};
 }
 
-// Export the 5 semantic tools
+// Export the 6 semantic tools
 export const semanticTools = [
   createSemanticTool('vault'),
   createSemanticTool('edit'),
   createSemanticTool('view'),
   createSemanticTool('workflow'),
-  createSemanticTool('system')
+  createSemanticTool('system'),
+  createSemanticTool('graph')
 ];

@@ -15,6 +15,11 @@ export class ObsidianAPI {
     this.plugin = plugin;
   }
 
+  // Getter to access the App instance for graph operations
+  getApp(): App {
+    return this.app;
+  }
+
   // Server info
   async getServerInfo() {
     const baseInfo = {

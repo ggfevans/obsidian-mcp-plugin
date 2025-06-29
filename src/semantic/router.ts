@@ -12,6 +12,9 @@ import { limitResponse } from '../utils/response-limiter';
 import { isImageFile } from '../types/obsidian';
 import { UniversalFragmentRetriever } from '../indexing/fragment-retriever';
 import { readFileWithFragments } from '../utils/file-reader';
+import { GraphSearchTool } from '../tools/graph-search';
+import { GraphSearchTool as GraphSearchTraversalTool } from '../tools/graph-search-tool';
+import { App } from 'obsidian';
 
 export class SemanticRouter {
   private config!: WorkflowConfig;
@@ -19,11 +22,19 @@ export class SemanticRouter {
   private api: ObsidianAPI;
   private tokenManager: StateTokenManager;
   private fragmentRetriever: UniversalFragmentRetriever;
+  private graphSearchTool?: GraphSearchTool;
+  private graphSearchTraversalTool?: GraphSearchTraversalTool;
+  private app?: App;
   
-  constructor(api: ObsidianAPI) {
+  constructor(api: ObsidianAPI, app?: App) {
     this.api = api;
+    this.app = app;
     this.tokenManager = new StateTokenManager();
     this.fragmentRetriever = new UniversalFragmentRetriever();
+    if (app) {
+      this.graphSearchTool = new GraphSearchTool(api, app);
+      this.graphSearchTraversalTool = new GraphSearchTraversalTool(app, api);
+    }
     this.loadConfig();
   }
   
@@ -95,6 +106,8 @@ export class SemanticRouter {
         return this.executeWorkflowOperation(action, params);
       case 'system':
         return this.executeSystemOperation(action, params);
+      case 'graph':
+        return this.executeGraphOperation(action, params);
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }
@@ -603,6 +616,32 @@ export class SemanticRouter {
       default:
         throw new Error(`Unknown system action: ${action}`);
     }
+  }
+  
+  private async executeGraphOperation(action: string, params: any): Promise<any> {
+    // Handle graph search traversal operations
+    if (action === 'search-traverse' || action === 'advanced-traverse') {
+      if (!this.graphSearchTraversalTool) {
+        throw new Error('Graph search traversal operations require Obsidian app context');
+      }
+      return await this.graphSearchTraversalTool.execute({
+        action,
+        ...params
+      });
+    }
+    
+    // Handle standard graph operations
+    if (!this.graphSearchTool) {
+      throw new Error('Graph operations require Obsidian app context');
+    }
+    
+    // Map action to graph operation
+    const graphParams = {
+      ...params,
+      operation: action
+    };
+    
+    return await this.graphSearchTool.search(graphParams);
   }
   
   private enrichResponse(result: any, operation: string, action: string, params: any, isError: boolean): SemanticResponse {
