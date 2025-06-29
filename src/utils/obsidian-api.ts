@@ -352,9 +352,14 @@ export class ObsidianAPI {
 
     // Fallback to our official API implementation
     const searchResults = await this.performVaultSearch(query, strategy, includeContent);
+    console.log(`Search found ${searchResults.length} results for query: ${query}`);
+    if (searchResults.length > 0) {
+      console.log('First few results:', searchResults.slice(0, 3).map(r => ({ path: r.path, score: r.score })));
+    }
     
     // Apply pagination
     const paginatedResponse = paginateResults(searchResults, page, pageSize);
+    console.log(`After pagination: ${paginatedResponse.results.length} results shown, ${paginatedResponse.totalResults} total`);
     
     return {
       query,
