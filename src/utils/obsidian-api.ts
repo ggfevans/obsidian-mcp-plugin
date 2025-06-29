@@ -369,7 +369,26 @@ export class ObsidianAPI {
     const paginatedResponse = paginateResults(searchResults, page, pageSize);
     console.log(`After pagination: ${paginatedResponse.results.length} results shown, ${paginatedResponse.totalResults} total`);
     
-    const response = {
+    const response: {
+      query: string;
+      page: number;
+      pageSize: number;
+      totalResults: number;
+      totalPages: number;
+      results: SearchResult[];
+      method: string;
+      truncated?: boolean;
+      originalCount?: number;
+      message?: string;
+      workflow?: {
+        message: string;
+        suggested_next: Array<{
+          description: string;
+          command: string;
+          reason: string;
+        }>;
+      };
+    } = {
       query,
       page: paginatedResponse.page,
       pageSize: paginatedResponse.pageSize,
