@@ -76,7 +76,7 @@ export function limitSearchResults(
     // Create a minimal result object
     const minimalResult: any = {
       path: result.path || result.filename || '',
-      title: result.title || result.basename || result.path?.split('/').pop()?.replace('.md', '') || ''
+      title: result.title || result.basename || result.path?.split('/').pop()?.replace(/\.(md|png|jpg|jpeg|gif|svg|pdf|txt|json)$/i, '') || ''
     };
     
     // Add score if available

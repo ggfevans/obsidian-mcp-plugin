@@ -61,11 +61,9 @@ const createSemanticTool = (operation: string) => ({
       };
     }
     
-    // Filter out image files from search results to prevent JSON serialization errors
+    // Only filter image files if they contain binary data that would cause JSON errors
+    // For search results, we want to show image files in the results list
     let filteredResult = response.result;
-    if (operation === 'vault' && args.action === 'search' && response.result) {
-      filteredResult = filterImageFilesFromSearchResults(response.result);
-    }
     
     try {
       return {
