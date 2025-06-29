@@ -441,6 +441,25 @@ export class ObsidianAPI {
   }
 
   /**
+   * Extract quoted phrases from a search string
+   */
+  private extractQuotedPhrases(text: string): { phrases: string[], remaining: string } {
+    const phrases: string[] = [];
+    let remaining = text;
+    
+    // Match quoted strings, handling escaped quotes
+    const quoteRegex = /"([^"\\]*(\\.[^"\\]*)*)"/g;
+    let match;
+    
+    while ((match = quoteRegex.exec(text)) !== null) {
+      phrases.push(match[1]);
+      remaining = remaining.replace(match[0], `__PHRASE_${phrases.length - 1}__`);
+    }
+    
+    return { phrases, remaining };
+  }
+
+  /**
    * Parse search query to handle operators like file:, path:, content:
    */
   private parseSearchQuery(query: string): {
@@ -482,10 +501,27 @@ export class ObsidianAPI {
       return { type: 'tag', term: trimmed.substring(4).trim(), originalQuery: query };
     }
     
-    // Check for OR operator
+    // Check for OR operator (handle quoted phrases)
     if (trimmed.includes(' OR ')) {
-      const orTerms = trimmed.split(' OR ').map(t => t.trim());
-      return { type: 'general', term: trimmed, originalQuery: query, isOr: true, orTerms };
+      const { phrases, remaining } = this.extractQuotedPhrases(trimmed);
+      
+      // Split on OR, then restore phrases
+      const orParts = remaining.split(' OR ').map(part => {
+        let restored = part.trim();
+        phrases.forEach((phrase, i) => {
+          restored = restored.replace(`__PHRASE_${i}__`, phrase);
+        });
+        return restored;
+      });
+      
+      return { type: 'general', term: trimmed, originalQuery: query, isOr: true, orTerms: orParts };
+    }
+    
+    // Check for quoted phrases in single terms
+    const { phrases } = this.extractQuotedPhrases(trimmed);
+    if (phrases.length === 1 && trimmed === `"${phrases[0]}"`) {
+      // Single quoted phrase
+      return { type: 'general', term: phrases[0], originalQuery: query };
     }
     
     return { type: 'general', term: trimmed, originalQuery: query };
