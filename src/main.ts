@@ -533,9 +533,9 @@ class MCPSettingTab extends PluginSettingTab {
 		codeEl.style.marginTop = '5px';
 		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
 		
-		info.createEl('h4', {text: 'Claude Desktop Configuration'});
+		info.createEl('h4', {text: 'Client Configuration (Claude Desktop, Cline, etc.)'});
 		const desktopDesc = info.createEl('p', {
-			text: 'Add this to your Claude Desktop configuration file:'
+			text: 'Add this to your MCP client configuration file:'
 		});
 		desktopDesc.style.marginBottom = '10px';
 		
