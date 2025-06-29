@@ -33,6 +33,18 @@ export class AdvancedSearchService {
   }
 
   /**
+   * Check if a file is readable as text (not binary)
+   */
+  private isTextFile(file: TFile): boolean {
+    const textExtensions = new Set([
+      'md', 'txt', 'json', 'js', 'ts', 'css', 'html', 'xml', 'yaml', 'yml', 
+      'csv', 'log', 'py', 'java', 'cpp', 'c', 'h', 'php', 'rb', 'go', 'rs',
+      'sql', 'sh', 'bat', 'ps1', 'ini', 'conf', 'config', 'env'
+    ]);
+    return textExtensions.has(file.extension.toLowerCase());
+  }
+
+  /**
    * Perform advanced search with ranking and snippets
    */
   async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
@@ -123,6 +135,11 @@ export class AdvancedSearchService {
     snippetLength: number,
     includeMetadata: boolean
   ): Promise<SearchResult | null> {
+    // Only attempt content search for text files
+    if (!this.isTextFile(file)) {
+      return null;
+    }
+
     try {
       const content = await this.app.vault.read(file);
       const contentTokens = this.tokenize(content.toLowerCase());

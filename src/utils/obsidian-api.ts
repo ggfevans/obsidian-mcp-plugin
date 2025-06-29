@@ -282,6 +282,18 @@ export class ObsidianAPI {
     return { success: true, updated_content: content };
   }
 
+  /**
+   * Check if a file is readable as text (not binary)
+   */
+  private isTextFile(file: any): boolean {
+    const textExtensions = new Set([
+      'md', 'txt', 'json', 'js', 'ts', 'css', 'html', 'xml', 'yaml', 'yml', 
+      'csv', 'log', 'py', 'java', 'cpp', 'c', 'h', 'php', 'rb', 'go', 'rs',
+      'sql', 'sh', 'bat', 'ps1', 'ini', 'conf', 'config', 'env'
+    ]);
+    return textExtensions.has(file.extension.toLowerCase());
+  }
+
   // Search operations
   async searchSimple(query: string) {
     try {
@@ -411,11 +423,28 @@ export class ObsidianAPI {
     const queryLower = query.toLowerCase();
 
     for (const file of files) {
+      // Check filename match first (works for all file types)
+      if (file.path.toLowerCase().includes(queryLower)) {
+        results.push({
+          filename: file.path,
+          matches: [{
+            line: `File: ${file.name}`,
+            lineNumber: 0
+          }]
+        });
+        continue;
+      }
+
+      // Only attempt content search for text files
+      if (!this.isTextFile(file)) {
+        continue;
+      }
+
       try {
         const content = await this.app.vault.read(file);
         const contentLower = content.toLowerCase();
         
-        if (contentLower.includes(queryLower) || file.path.toLowerCase().includes(queryLower)) {
+        if (contentLower.includes(queryLower)) {
           // Find matching lines
           const lines = content.split('\n');
           const matchingLines = lines
