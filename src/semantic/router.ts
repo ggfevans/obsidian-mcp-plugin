@@ -609,8 +609,9 @@ export class SemanticRouter {
     const operationConfig = this.config?.operations?.[operation];
     const actionConfig = operationConfig?.actions?.[action];
     
-    // Skip limiting for vault read operations - we want the full document
-    const shouldLimit = !(operation === 'vault' && action === 'read');
+    // Skip limiting for vault read operations and view file operations - we want the full document/image
+    const shouldLimit = !(operation === 'vault' && action === 'read') && 
+                       !(operation === 'view' && action === 'file');
     
     // Limit the result size to prevent token overflow (except for vault reads)
     const limitedResult = shouldLimit ? limitResponse(result) : result;
