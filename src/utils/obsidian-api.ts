@@ -3,19 +3,16 @@ import { ObsidianConfig, ObsidianFile, ObsidianFileResponse } from '../types/obs
 import { paginateResults, paginateFiles } from './response-limiter';
 import { isImageFile as checkIsImageFile, processImageResponse } from './image-handler';
 import { getVersion } from '../version';
-import { AdvancedSearchService, SearchResult, SearchOptions } from './advanced-search';
+import { SearchResult } from './advanced-search';
 
 export class ObsidianAPI {
   private app: App;
   private config: ObsidianConfig;
   private plugin?: any; // Reference to the plugin for accessing MCP server info
-  private searchService: AdvancedSearchService;
-
   constructor(app: App, config?: ObsidianConfig, plugin?: any) {
     this.app = app;
     this.config = config || { apiKey: '', apiUrl: '' };
     this.plugin = plugin;
-    this.searchService = new AdvancedSearchService(app);
   }
 
   // Server info
@@ -326,55 +323,36 @@ export class ObsidianAPI {
       };
     }
 
-    try {
-      // Try to use Obsidian's native search first
-      const searchPlugin = (this.app as any).internalPlugins?.plugins?.['global-search'];
-      if (searchPlugin?.instance?.searchIndex) {
-        const nativeResults = searchPlugin.instance.searchIndex.search(query);
-        if (nativeResults && Array.isArray(nativeResults)) {
-          // Convert native results to our format and add special processing
-          const processedResults = await this.processNativeSearchResults(
-            nativeResults, 
-            query, 
-            strategy, 
-            includeContent
-          );
-          
-          // Apply pagination
-          const paginatedResponse = paginateResults(processedResults, page, pageSize);
-          
-          return {
-            query,
-            page: paginatedResponse.page,
-            pageSize: paginatedResponse.pageSize,
-            totalResults: paginatedResponse.totalResults,
-            totalPages: paginatedResponse.totalPages,
-            results: paginatedResponse.results,
-            method: `native-${strategy}`,
-            ...(paginatedResponse.truncated && {
-              truncated: true,
-              originalCount: paginatedResponse.originalCount,
-              message: paginatedResponse.message
-            })
-          };
-        }
-      }
-    } catch (error) {
-      console.warn('Native search failed, falling back to advanced search:', error);
+    // Use Obsidian's native search
+    const searchPlugin = (this.app as any).internalPlugins?.plugins?.['global-search'];
+    if (!searchPlugin?.instance?.searchIndex) {
+      throw new Error('Obsidian search plugin not available');
     }
 
-    // Fallback to our advanced search service
-    const searchOptions: SearchOptions = {
-      strategy,
-      maxResults: 200,
-      snippetLength: includeContent ? 200 : 0,
-      includeMetadata: true
-    };
+    const nativeResults = searchPlugin.instance.searchIndex.search(query);
+    if (!nativeResults || !Array.isArray(nativeResults)) {
+      // Return empty results if search returns nothing
+      return {
+        query,
+        page,
+        pageSize,
+        totalResults: 0,
+        totalPages: 0,
+        results: [],
+        method: `native-${strategy}`
+      };
+    }
 
-    const allResults = await this.searchService.search(query, searchOptions);
+    // Convert native results to our format and add special processing
+    const processedResults = await this.processNativeSearchResults(
+      nativeResults, 
+      query, 
+      strategy, 
+      includeContent
+    );
     
-    // Apply pagination with token limits
-    const paginatedResponse = paginateResults(allResults, page, pageSize);
+    // Apply pagination
+    const paginatedResponse = paginateResults(processedResults, page, pageSize);
     
     return {
       query,
@@ -383,7 +361,7 @@ export class ObsidianAPI {
       totalResults: paginatedResponse.totalResults,
       totalPages: paginatedResponse.totalPages,
       results: paginatedResponse.results,
-      method: `advanced-${strategy}`,
+      method: `native-${strategy}`,
       ...(paginatedResponse.truncated && {
         truncated: true,
         originalCount: paginatedResponse.originalCount,
