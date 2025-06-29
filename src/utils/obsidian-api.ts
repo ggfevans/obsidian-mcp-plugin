@@ -338,14 +338,51 @@ export class ObsidianAPI {
         totalResults: 0,
         totalPages: 0,
         results: [],
-        method: 'advanced'
+        method: 'native'
       };
     }
 
-    // Use advanced search service for ranking and snippets
+    try {
+      // Try to use Obsidian's native search first
+      const searchPlugin = (this.app as any).internalPlugins?.plugins?.['global-search'];
+      if (searchPlugin?.instance?.searchIndex) {
+        const nativeResults = searchPlugin.instance.searchIndex.search(query);
+        if (nativeResults && Array.isArray(nativeResults)) {
+          // Convert native results to our format and add special processing
+          const processedResults = await this.processNativeSearchResults(
+            nativeResults, 
+            query, 
+            strategy, 
+            includeContent
+          );
+          
+          // Apply pagination
+          const paginatedResponse = paginateResults(processedResults, page, pageSize);
+          
+          return {
+            query,
+            page: paginatedResponse.page,
+            pageSize: paginatedResponse.pageSize,
+            totalResults: paginatedResponse.totalResults,
+            totalPages: paginatedResponse.totalPages,
+            results: paginatedResponse.results,
+            method: `native-${strategy}`,
+            ...(paginatedResponse.truncated && {
+              truncated: true,
+              originalCount: paginatedResponse.originalCount,
+              message: paginatedResponse.message
+            })
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('Native search failed, falling back to advanced search:', error);
+    }
+
+    // Fallback to our advanced search service
     const searchOptions: SearchOptions = {
       strategy,
-      maxResults: 200, // Get more results for better pagination
+      maxResults: 200,
       snippetLength: includeContent ? 200 : 0,
       includeMetadata: true
     };
@@ -369,6 +406,94 @@ export class ObsidianAPI {
         message: paginatedResponse.message
       })
     };
+  }
+
+  /**
+   * Process native Obsidian search results and add our special processing
+   */
+  private async processNativeSearchResults(
+    nativeResults: any[],
+    query: string,
+    strategy: string,
+    includeContent: boolean
+  ): Promise<SearchResult[]> {
+    const results: SearchResult[] = [];
+    
+    for (const nativeResult of nativeResults) {
+      try {
+        // Native results typically have: file, score, matches
+        const file = nativeResult.file;
+        if (!file) continue;
+        
+        const result: SearchResult = {
+          path: file.path,
+          title: file.basename,
+          score: nativeResult.score || 1.0,
+          metadata: {
+            size: file.stat?.size || 0,
+            modified: file.stat?.mtime || 0,
+            extension: file.extension || ''
+          }
+        };
+        
+        // Add snippets for text files if requested
+        if (includeContent && this.isTextFile(file)) {
+          try {
+            const content = await this.app.vault.read(file);
+            const snippet = this.extractSnippet(content, query, 200);
+            if (snippet) {
+              result.snippet = snippet;
+            }
+          } catch (error) {
+            // If we can't read the file, skip snippet generation
+            console.warn(`Could not read file for snippet: ${file.path}`, error);
+          }
+        }
+        
+        results.push(result);
+      } catch (error) {
+        console.warn('Error processing native search result:', error);
+        continue;
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Extract a snippet around query matches
+   */
+  private extractSnippet(
+    content: string, 
+    query: string, 
+    maxLength: number
+  ): { content: string; lineStart: number; lineEnd: number; score: number } | undefined {
+    const lines = content.split('\n');
+    const queryLower = query.toLowerCase();
+    
+    // Find the first line that contains the query
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(queryLower)) {
+        const start = Math.max(0, i - 1);
+        const end = Math.min(lines.length - 1, i + 2);
+        const snippetLines = lines.slice(start, end + 1);
+        const snippetContent = snippetLines.join('\n');
+        
+        // Truncate if too long
+        const truncated = snippetContent.length > maxLength 
+          ? snippetContent.substring(0, maxLength) + '...'
+          : snippetContent;
+        
+        return {
+          content: truncated,
+          lineStart: start + 1,
+          lineEnd: end + 1,
+          score: 1.0
+        };
+      }
+    }
+    
+    return undefined;
   }
 
   // Obsidian integration
