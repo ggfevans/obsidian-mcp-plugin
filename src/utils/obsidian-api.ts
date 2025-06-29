@@ -323,36 +323,38 @@ export class ObsidianAPI {
       };
     }
 
-    // Use Obsidian's native search
-    const searchPlugin = (this.app as any).internalPlugins?.plugins?.['global-search'];
-    if (!searchPlugin?.instance?.searchIndex) {
-      throw new Error('Obsidian search plugin not available');
+    // Try to access internal search API first, then fallback to our implementation
+    try {
+      const searchResults = await this.tryInternalSearch(query);
+      if (searchResults && searchResults.length > 0) {
+        // Process internal search results
+        const processedResults = await this.processNativeSearchResults(searchResults, query, strategy, includeContent);
+        const paginatedResponse = paginateResults(processedResults, page, pageSize);
+        
+        return {
+          query,
+          page: paginatedResponse.page,
+          pageSize: paginatedResponse.pageSize,
+          totalResults: paginatedResponse.totalResults,
+          totalPages: paginatedResponse.totalPages,
+          results: paginatedResponse.results,
+          method: `internal-${strategy}`,
+          ...(paginatedResponse.truncated && {
+            truncated: true,
+            originalCount: paginatedResponse.originalCount,
+            message: paginatedResponse.message
+          })
+        };
+      }
+    } catch (error) {
+      console.warn('Internal search failed, using official API:', error);
     }
 
-    const nativeResults = searchPlugin.instance.searchIndex.search(query);
-    if (!nativeResults || !Array.isArray(nativeResults)) {
-      // Return empty results if search returns nothing
-      return {
-        query,
-        page,
-        pageSize,
-        totalResults: 0,
-        totalPages: 0,
-        results: [],
-        method: `native-${strategy}`
-      };
-    }
-
-    // Convert native results to our format and add special processing
-    const processedResults = await this.processNativeSearchResults(
-      nativeResults, 
-      query, 
-      strategy, 
-      includeContent
-    );
+    // Fallback to our official API implementation
+    const searchResults = await this.performVaultSearch(query, strategy, includeContent);
     
     // Apply pagination
-    const paginatedResponse = paginateResults(processedResults, page, pageSize);
+    const paginatedResponse = paginateResults(searchResults, page, pageSize);
     
     return {
       query,
@@ -368,6 +370,194 @@ export class ObsidianAPI {
         message: paginatedResponse.message
       })
     };
+  }
+
+  /**
+   * Try to access Obsidian's internal search API
+   */
+  private async tryInternalSearch(query: string): Promise<any[] | null> {
+    // Check if app has a search method directly
+    if ((this.app as any).search) {
+      console.log('Found app.search method');
+      return (this.app as any).search(query);
+    }
+
+    // Try internal plugins
+    const internalPlugins = (this.app as any).internalPlugins;
+    if (internalPlugins) {
+      console.log('Available internal plugins:', Object.keys(internalPlugins.plugins || {}));
+      
+      // Try different plugin names
+      const searchPluginNames = ['global-search', 'search', 'core-search', 'file-search'];
+      for (const name of searchPluginNames) {
+        const plugin = internalPlugins.plugins?.[name];
+        if (plugin?.instance?.search) {
+          console.log(`Found search method in ${name} plugin`);
+          return plugin.instance.search(query);
+        }
+        if (plugin?.instance?.searchIndex?.search) {
+          console.log(`Found searchIndex.search in ${name} plugin`);
+          return plugin.instance.searchIndex.search(query);
+        }
+      }
+    }
+
+    // Try workspace search
+    if ((this.app as any).workspace?.search) {
+      console.log('Found workspace.search method');
+      return (this.app as any).workspace.search(query);
+    }
+
+    console.log('No internal search API found');
+    return null;
+  }
+
+  /**
+   * Perform vault search using official Obsidian API
+   */
+  private async performVaultSearch(
+    query: string,
+    strategy: string,
+    includeContent: boolean
+  ): Promise<SearchResult[]> {
+    const searchTerm = this.parseSearchQuery(query);
+    const files = this.app.vault.getFiles();
+    const results: SearchResult[] = [];
+
+    for (const file of files) {
+      const matchResult = await this.checkFileMatch(file, searchTerm, includeContent);
+      if (matchResult) {
+        results.push(matchResult);
+      }
+    }
+
+    // Sort by relevance score
+    return results.sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Parse search query to handle operators like file:, path:, content:
+   */
+  private parseSearchQuery(query: string): {
+    type: 'filename' | 'path' | 'content' | 'tag' | 'general';
+    term: string;
+    originalQuery: string;
+  } {
+    const trimmed = query.trim();
+    
+    // Check for operators
+    if (trimmed.startsWith('file:')) {
+      return { type: 'filename', term: trimmed.substring(5).trim(), originalQuery: query };
+    }
+    if (trimmed.startsWith('path:')) {
+      return { type: 'path', term: trimmed.substring(5).trim(), originalQuery: query };
+    }
+    if (trimmed.startsWith('content:')) {
+      return { type: 'content', term: trimmed.substring(8).trim(), originalQuery: query };
+    }
+    if (trimmed.startsWith('tag:')) {
+      return { type: 'tag', term: trimmed.substring(4).trim(), originalQuery: query };
+    }
+    
+    return { type: 'general', term: trimmed, originalQuery: query };
+  }
+
+  /**
+   * Check if a file matches the search criteria
+   */
+  private async checkFileMatch(
+    file: TFile,
+    searchTerm: { type: string; term: string; originalQuery: string },
+    includeContent: boolean
+  ): Promise<SearchResult | null> {
+    const termLower = searchTerm.term.toLowerCase();
+    let score = 0;
+    let snippet = undefined;
+
+    switch (searchTerm.type) {
+      case 'filename':
+        if (file.basename.toLowerCase().includes(termLower)) {
+          score = file.basename.toLowerCase() === termLower ? 2.0 : 1.0;
+        }
+        break;
+        
+      case 'path':
+        if (file.path.toLowerCase().includes(termLower)) {
+          score = file.path.toLowerCase() === termLower ? 2.0 : 1.0;
+        }
+        break;
+        
+      case 'content':
+        if (this.isTextFile(file)) {
+          try {
+            const content = await this.app.vault.read(file);
+            if (content.toLowerCase().includes(termLower)) {
+              score = 1.0;
+              if (includeContent) {
+                snippet = this.extractSnippet(content, searchTerm.term, 200);
+              }
+            }
+          } catch (error) {
+            // Skip files that can't be read
+          }
+        }
+        break;
+        
+      case 'tag':
+        if (this.isTextFile(file)) {
+          try {
+            const cache = this.app.metadataCache.getFileCache(file);
+            if (cache?.tags) {
+              const tagMatch = cache.tags.some(tagRef => 
+                tagRef.tag.toLowerCase().includes(termLower)
+              );
+              if (tagMatch) {
+                score = 1.0;
+              }
+            }
+          } catch (error) {
+            // Skip if metadata unavailable
+          }
+        }
+        break;
+        
+      case 'general':
+        // Check filename first
+        if (file.basename.toLowerCase().includes(termLower)) {
+          score = 1.5;
+        }
+        // Check content for text files
+        if (this.isTextFile(file)) {
+          try {
+            const content = await this.app.vault.read(file);
+            if (content.toLowerCase().includes(termLower)) {
+              score = Math.max(score, 1.0);
+              if (includeContent) {
+                snippet = this.extractSnippet(content, searchTerm.term, 200);
+              }
+            }
+          } catch (error) {
+            // Skip files that can't be read
+          }
+        }
+        break;
+    }
+
+    if (score > 0) {
+      return {
+        path: file.path,
+        title: file.basename,
+        score,
+        snippet,
+        metadata: {
+          size: file.stat.size,
+          modified: file.stat.mtime,
+          extension: file.extension
+        }
+      };
+    }
+
+    return null;
   }
 
   /**
