@@ -2,21 +2,21 @@ import { App, TFile, CachedMetadata } from 'obsidian';
 import { ObsidianAPI } from '../utils/obsidian-api';
 import { SearchCore } from '../utils/search-core';
 
-interface SearchSnippet {
+export interface SearchSnippet {
     text: string;
     score: number;
     context: string;
     lineNumber?: number;
 }
 
-interface TraversalNode {
+export interface TraversalNode {
     path: string;
     depth: number;
     snippet: SearchSnippet;
     parentPath?: string;
 }
 
-interface GraphSearchResult {
+export interface GraphSearchResult {
     startNode: string;
     searchQuery: string;
     maxDepth: number;
@@ -112,7 +112,7 @@ export class GraphSearchTraversal {
     /**
      * Search for snippets within a file
      */
-    private async searchInFile(file: TFile, query: string, maxSnippets: number): Promise<SearchSnippet[]> {
+    protected async searchInFile(file: TFile, query: string, maxSnippets: number): Promise<SearchSnippet[]> {
         const content = await this.app.vault.read(file);
         const lines = content.split('\n');
         const snippets: SearchSnippet[] = [];
@@ -167,7 +167,7 @@ export class GraphSearchTraversal {
     /**
      * Get all linked paths from a file (both forward and backlinks)
      */
-    private async getLinkedPaths(file: TFile): Promise<string[]> {
+    protected async getLinkedPaths(file: TFile): Promise<string[]> {
         const linkedPaths = new Set<string>();
         
         // Get forward links

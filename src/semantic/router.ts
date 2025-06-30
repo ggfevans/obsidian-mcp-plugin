@@ -14,6 +14,7 @@ import { UniversalFragmentRetriever } from '../indexing/fragment-retriever';
 import { readFileWithFragments } from '../utils/file-reader';
 import { GraphSearchTool } from '../tools/graph-search';
 import { GraphSearchTool as GraphSearchTraversalTool } from '../tools/graph-search-tool';
+import { GraphTagTool } from '../tools/graph-tag-tool';
 import { App } from 'obsidian';
 
 export class SemanticRouter {
@@ -24,6 +25,7 @@ export class SemanticRouter {
   private fragmentRetriever: UniversalFragmentRetriever;
   private graphSearchTool?: GraphSearchTool;
   private graphSearchTraversalTool?: GraphSearchTraversalTool;
+  private graphTagTool?: GraphTagTool;
   private app?: App;
   
   constructor(api: ObsidianAPI, app?: App) {
@@ -34,6 +36,7 @@ export class SemanticRouter {
     if (app) {
       this.graphSearchTool = new GraphSearchTool(api, app);
       this.graphSearchTraversalTool = new GraphSearchTraversalTool(app, api);
+      this.graphTagTool = new GraphTagTool(app, api);
     }
     this.loadConfig();
   }
@@ -625,6 +628,17 @@ export class SemanticRouter {
         throw new Error('Graph search traversal operations require Obsidian app context');
       }
       return await this.graphSearchTraversalTool.execute({
+        action,
+        ...params
+      });
+    }
+    
+    // Handle tag-based graph operations
+    if (action === 'tag-traverse' || action === 'tag-analysis' || action === 'shared-tags') {
+      if (!this.graphTagTool) {
+        throw new Error('Graph tag operations require Obsidian app context');
+      }
+      return await this.graphTagTool.execute({
         action,
         ...params
       });

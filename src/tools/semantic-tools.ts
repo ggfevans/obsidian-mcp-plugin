@@ -146,7 +146,7 @@ function getOperationDescription(operation: string): string {
     view: 'Content viewing and navigation - file, window, active, open_in_obsidian',
     workflow: 'Workflow guidance and suggestions based on current context',
     system: 'System operations - info, commands, fetch_web',
-    graph: 'Graph traversal and link analysis - traverse (explore connected nodes), neighbors (get immediate connections), path (find paths between nodes), statistics (get link counts), backlinks (incoming links), forwardlinks (outgoing links), search-traverse (search-based graph traversal returning snippet chains), advanced-traverse (multi-query search traversal with strategies)'
+    graph: 'Graph traversal and link analysis - traverse (explore connected nodes), neighbors (get immediate connections), path (find paths between nodes), statistics (get link counts), backlinks (incoming links), forwardlinks (outgoing links), search-traverse (search-based graph traversal returning snippet chains), advanced-traverse (multi-query search traversal with strategies), tag-traverse (follow tag connections as graph edges), tag-analysis (analyze tag-based connectivity), shared-tags (find common tags between files)'
   };
   return descriptions[operation] || 'Unknown operation';
 }
@@ -158,7 +158,7 @@ function getActionsForOperation(operation: string): string[] {
     view: ['file', 'window', 'active', 'open_in_obsidian'],
     workflow: ['suggest'],
     system: ['info', 'commands', 'fetch_web'],
-    graph: ['traverse', 'neighbors', 'path', 'statistics', 'backlinks', 'forwardlinks', 'search-traverse', 'advanced-traverse']
+    graph: ['traverse', 'neighbors', 'path', 'statistics', 'backlinks', 'forwardlinks', 'search-traverse', 'advanced-traverse', 'tag-traverse', 'tag-analysis', 'shared-tags']
   };
   return actions[operation] || [];
 }
@@ -370,6 +370,15 @@ function getParametersForOperation(operation: string): Record<string, any> {
       filePattern: {
         type: 'string',
         description: 'Filter traversal to files matching this pattern'
+      },
+      // Tag-based graph parameters
+      tagWeight: {
+        type: 'number',
+        description: 'Weight factor for tag connections (0-1, default: 0.8)'
+      },
+      targetPath: {
+        type: 'string',
+        description: 'Target file path (for shared-tags operation)'
       }
     }
   };
