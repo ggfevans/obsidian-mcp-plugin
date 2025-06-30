@@ -31,8 +31,8 @@ describe('GraphSearchTraversal', () => {
     describe('searchTraverse', () => {
         it('should traverse graph and return snippet chain', async () => {
             // Mock file structure
-            const mockFile1 = { path: 'note1.md' } as TFile;
-            const mockFile2 = { path: 'note2.md' } as TFile;
+            const mockFile1 = { path: 'note1.md', extension: 'md', name: 'note1.md' } as TFile;
+            const mockFile2 = { path: 'note2.md', extension: 'md', name: 'note2.md' } as TFile;
             
             // Mock vault methods
             mockApp.vault.getAbstractFileByPath = jest.fn()
@@ -74,7 +74,7 @@ describe('GraphSearchTraversal', () => {
         });
 
         it('should respect score threshold', async () => {
-            const mockFile = { path: 'note1.md' } as TFile;
+            const mockFile = { path: 'note1.md', extension: 'md', name: 'note1.md' } as TFile;
             
             mockApp.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFile);
             mockApp.vault.read = jest.fn().mockResolvedValue('This document has no relevant content');
