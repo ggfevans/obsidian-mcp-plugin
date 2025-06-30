@@ -27,9 +27,9 @@ export interface GraphSearchResult {
 
 export class GraphSearchTraversal {
     constructor(
-        private app: App,
-        private api: ObsidianAPI,
-        private searchCore: SearchCore
+        protected app: App,
+        protected api: ObsidianAPI,
+        protected searchCore: SearchCore
     ) {}
 
     /**
