@@ -1,4 +1,4 @@
-name: Build and Release
+name: Create Release
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths-ignore:
       - '**.md'
       - '.gitignore'
+      - '.github/workflows/build.yml'
 
 env:
   PLUGIN_NAME: obsidian-mcp-plugin

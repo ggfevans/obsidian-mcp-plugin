@@ -1,0 +1,77 @@
+name: Feature Branch Pre-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'alpha'
+        type: choice
+        options:
+          - alpha
+          - beta
+          - rc
+
+permissions:
+  contents: write
+
+jobs:
+  pre-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Get version and branch info
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' manifest.json)
+          BRANCH=$(echo ${GITHUB_REF#refs/heads/})
+          SAFE_BRANCH=$(echo $BRANCH | sed 's/[^a-zA-Z0-9-]/-/g')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "safe_branch=$SAFE_BRANCH" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}-${SAFE_BRANCH}-${{ inputs.release_type }}" >> $GITHUB_OUTPUT
+
+      - name: Create Pre-Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Pre-Release: v${{ steps.version.outputs.version }} (${{ steps.version.outputs.branch }})" \
+            --notes "## Pre-Release Build from \`${{ steps.version.outputs.branch }}\`
+
+          **⚠️ This is a pre-release build and may contain bugs.**
+
+          ### Installation via BRAT
+          1. Install the BRAT plugin if you haven't already
+          2. Command palette → \"BRAT: Add a beta plugin for testing\"
+          3. Enter: \`aaronsb/obsidian-mcp-plugin\`
+          4. Enable the plugin in Community Plugins
+
+          ### Changes in this branch
+          See the [branch comparison](https://github.com/${{ github.repository }}/compare/main...${{ steps.version.outputs.branch }}) for changes.
+
+          ### Type: ${{ inputs.release_type }}
+          - **alpha**: Early development build, expect bugs
+          - **beta**: Feature complete but needs testing
+          - **rc**: Release candidate, final testing phase" \
+            --prerelease \
+            --target "${{ steps.version.outputs.branch }}" \
+            main.js \
+            manifest.json \
+            styles.css
