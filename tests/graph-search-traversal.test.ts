@@ -94,8 +94,8 @@ describe('GraphSearchTraversal', () => {
         });
 
         it('should handle circular references', async () => {
-            const mockFile1 = { path: 'note1.md' } as TFile;
-            const mockFile2 = { path: 'note2.md' } as TFile;
+            const mockFile1 = { path: 'note1.md', extension: 'md', name: 'note1.md' } as TFile;
+            const mockFile2 = { path: 'note2.md', extension: 'md', name: 'note2.md' } as TFile;
             
             // Create circular reference
             mockApp.vault.getAbstractFileByPath = jest.fn()
