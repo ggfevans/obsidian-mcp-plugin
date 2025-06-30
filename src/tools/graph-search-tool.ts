@@ -153,7 +153,7 @@ export class GraphSearchTool {
                 suggestions.push('Consider increasing maxDepth to explore deeper connections');
             }
             
-            const avgScore = result.traversalChain.reduce((sum, node) => 
+            const avgScore = result.traversalChain.reduce((sum: number, node: any) => 
                 sum + node.snippet.score, 0) / result.traversalChain.length;
             
             if (avgScore < 0.7) {

@@ -13,7 +13,7 @@ const mockApp = {
     metadataCache: {
         getFileCache: jest.fn(),
         getFirstLinkpathDest: jest.fn(),
-        getBacklinksForFile: jest.fn()
+        resolvedLinks: {} as any
     }
 } as unknown as App;
 
@@ -79,8 +79,7 @@ describe('GraphSearchTraversal', () => {
             mockApp.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFile);
             mockApp.vault.read = jest.fn().mockResolvedValue('This document has no relevant content');
             mockApp.metadataCache.getFileCache = jest.fn().mockReturnValue({ links: [] });
-            mockApp.metadataCache.getBacklinksForFile = jest.fn()
-                .mockReturnValue({ data: new Map() });
+            mockApp.metadataCache.resolvedLinks = {};
             
             const result = await traversal.searchTraverse(
                 'note1.md',
