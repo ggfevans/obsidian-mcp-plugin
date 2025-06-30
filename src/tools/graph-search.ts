@@ -1,6 +1,6 @@
 import { ObsidianAPI } from '../utils/obsidian-api';
 import { GraphTraversal, GraphTraversalOptions, GraphNode, GraphEdge } from '../utils/graph-traversal';
-import { App } from 'obsidian';
+import { App, TFile } from 'obsidian';
 
 /**
  * Graph search parameters
@@ -351,7 +351,7 @@ export class GraphSearchTool {
     // Get node information for each backlink source
     for (const edge of backlinks) {
       const file = this.app.vault.getAbstractFileByPath(edge.source);
-      if (file) {
+      if (file && file instanceof TFile) {
         const cache = this.app.metadataCache.getFileCache(file);
         nodes.push({
           path: edge.source,
@@ -407,7 +407,7 @@ export class GraphSearchTool {
     // Get node information for each forward link target
     for (const edge of forwardLinks) {
       const file = this.app.vault.getAbstractFileByPath(edge.target);
-      if (file) {
+      if (file && file instanceof TFile) {
         const cache = this.app.metadataCache.getFileCache(file);
         nodes.push({
           path: edge.target,

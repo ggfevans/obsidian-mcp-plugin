@@ -180,11 +180,14 @@ export class GraphSearchTraversal {
             }
         }
         
-        // Get backlinks
-        const backlinks = this.app.metadataCache.getBacklinksForFile(file);
-        if (backlinks) {
-            for (const [sourcePath] of backlinks.data) {
-                linkedPaths.add(sourcePath);
+        // Get backlinks from resolvedLinks
+        const resolvedLinks = this.app.metadataCache.resolvedLinks;
+        if (resolvedLinks) {
+            // Iterate through all files to find which ones link to this file
+            for (const [sourcePath, links] of Object.entries(resolvedLinks)) {
+                if (links && links[file.path]) {
+                    linkedPaths.add(sourcePath);
+                }
             }
         }
         

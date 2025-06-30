@@ -51,8 +51,8 @@ describe('GraphSearchTraversal', () => {
             mockApp.metadataCache.getFirstLinkpathDest = jest.fn()
                 .mockReturnValue(mockFile2);
             
-            mockApp.metadataCache.getBacklinksForFile = jest.fn()
-                .mockReturnValue({ data: new Map() });
+            // Mock backlinks using resolvedLinks instead
+            mockApp.metadataCache.resolvedLinks = {};
             
             // Execute traversal
             const result = await traversal.searchTraverse(
