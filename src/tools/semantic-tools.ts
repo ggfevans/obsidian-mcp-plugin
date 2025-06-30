@@ -375,10 +375,6 @@ function getParametersForOperation(operation: string): Record<string, any> {
       tagWeight: {
         type: 'number',
         description: 'Weight factor for tag connections (0-1, default: 0.8)'
-      },
-      targetPath: {
-        type: 'string',
-        description: 'Target file path (for shared-tags operation)'
       }
     }
   };
