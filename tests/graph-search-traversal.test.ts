@@ -114,8 +114,7 @@ describe('GraphSearchTraversal', () => {
                 .mockReturnValueOnce(mockFile2)
                 .mockReturnValueOnce(mockFile1);
             
-            mockApp.metadataCache.getBacklinksForFile = jest.fn()
-                .mockReturnValue({ data: new Map() });
+            mockApp.metadataCache.resolvedLinks = {};
             
             const result = await traversal.searchTraverse(
                 'note1.md',
