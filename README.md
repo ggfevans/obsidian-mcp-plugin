@@ -152,8 +152,9 @@ The critical `ObsidianAPI` abstraction layer is preserved, allowing all semantic
 ## Testing Status
 
 ✅ **Working Features**:
-- All 5 semantic tools with all actions
+- All 6 semantic tools with all actions
 - Enhanced search with Obsidian operators
+- Graph traversal and link analysis
 - Image viewing and file operations
 - Fragment retrieval for large files
 - Workflow hints and guidance
