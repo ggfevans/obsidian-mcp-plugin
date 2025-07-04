@@ -16,7 +16,11 @@ This plugin brings MCP capabilities directly into Obsidian, eliminating the need
 
 ## Installation
 
-### Via BRAT (Beta Reviewer's Auto-update Tool)
+> **Note**: This plugin is currently pending review for the Obsidian Community Plugins directory. Until approved, please use the BRAT installation method below.
+
+### Current Installation: Via BRAT (Beta Reviewer's Auto-update Tool)
+
+Since this plugin is not yet in the Community Plugins directory, you'll need to use BRAT to install it:
 
 1. **Install BRAT**:
    - Open Obsidian Settings → Community Plugins
@@ -33,6 +37,17 @@ This plugin brings MCP capabilities directly into Obsidian, eliminating the need
    - Go to Settings → Community Plugins
    - Find "Obsidian MCP Plugin" and enable it
    - The plugin will auto-update through BRAT
+
+### Future Installation: Via Community Plugins (After Approval)
+
+Once this plugin is approved and available in the Obsidian Community Plugins directory:
+
+1. Open Obsidian Settings → Community Plugins
+2. Click "Browse" and search for "MCP"
+3. Find "Obsidian MCP Plugin" by Aaron Bockelie
+4. Click "Install" then "Enable"
+
+> **For BRAT Users**: After the plugin is approved, you can remove it from BRAT and install it normally through Community Plugins to receive standard updates.
 
 ## Configuration
 
@@ -160,6 +175,7 @@ The critical `ObsidianAPI` abstraction layer is preserved, allowing all semantic
 - Workflow hints and guidance
 - Multi-vault support
 - Port collision detection
+- Cross-platform tested (Linux, Windows, macOS)
 
 ⚡ **Performance Results**:
 - File operations: <10ms (vs ~50-100ms with REST API)
