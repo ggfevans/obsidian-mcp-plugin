@@ -296,6 +296,33 @@ async getFile(path: string): Promise<ObsidianFileResponse> {
 - **Migration Success**: Smooth transition for existing users
 - **Plugin Directory**: Successful submission and approval
 
+## Obsidian Community Plugin Submission
+
+### Maintaining PR During Review Process
+
+While waiting for Obsidian team review (typically 2-6 weeks), keep the PR active:
+
+#### Periodic PR Refresh
+```bash
+# Pull latest upstream changes
+git -C /home/aaron/Projects/app/obsidian-releases fetch upstream
+git -C /home/aaron/Projects/app/obsidian-releases rebase upstream/master
+
+# Push to trigger re-validation
+git -C /home/aaron/Projects/app/obsidian-releases push --force origin master
+```
+
+#### Benefits of Active Development During Review
+- Shows ongoing maintenance and commitment
+- Allows continuous improvement based on BRAT user feedback
+- Keeps PR current with upstream changes
+- Demonstrates plugin stability through multiple versions
+
+#### Release Tag Format
+- **Important**: Obsidian requires release tags WITHOUT 'v' prefix
+- Use `0.5.4` not `v0.5.4`
+- GitHub Actions workflow configured to create correct format
+
 ## Important Notes
 
 - **Critical Path**: The ObsidianAPI abstraction layer is the cornerstone of this architecture
