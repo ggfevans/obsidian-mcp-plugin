@@ -104,6 +104,23 @@ This plugin brings MCP capabilities directly into Obsidian, eliminating the need
 ### 🔄 `workflow` - AI Workflow Guidance
 - **suggest** - Get contextual suggestions based on current operations
 
+### 🕸️ `graph` - Graph Traversal and Link Analysis
+- **traverse** - Explore connected nodes from a starting point
+- **neighbors** - Get immediate connections of a file
+- **path** - Find paths between two nodes
+- **statistics** - Get link counts and statistics for files
+- **backlinks** - Find all incoming links to a file
+- **forwardlinks** - Find all outgoing links from a file
+- **search-traverse** - Search-based graph traversal with snippet chains
+- **advanced-traverse** - Multi-query traversal with strategies (breadth-first, best-first, beam-search)
+
+**Graph Features**:
+- Follow links, backlinks, and tags during traversal
+- Filter by file patterns, folders, or tags
+- Control traversal depth and maximum nodes
+- Get relevance scores and snippet chains
+- Support for orphaned notes and unresolved links
+
 ### ⚙️ `system` - System Operations
 - **info** - Get vault and plugin information
 - **commands** - List and execute Obsidian commands
