@@ -94,7 +94,7 @@ export class ObsidianAPI {
       throw new Error('No active file');
     }
 
-    await this.app.vault.delete(activeFile);
+    await this.app.fileManager.trashFile(activeFile);
     return { success: true };
   }
 
@@ -242,7 +242,7 @@ export class ObsidianAPI {
       throw new Error(`File not found: ${path}`);
     }
 
-    await this.app.vault.delete(file);
+    await this.app.fileManager.trashFile(file);
     return { success: true };
   }
 

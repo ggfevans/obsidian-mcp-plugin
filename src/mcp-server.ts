@@ -17,6 +17,7 @@ import { randomUUID } from 'crypto';
 import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
 import { semanticTools } from './tools/semantic-tools';
+import { Debug } from './utils/debug';
 
 
 export class MCPHttpServer {
@@ -80,7 +81,7 @@ export class MCPHttpServer {
         throw new Error(`Tool not found: ${name}`);
       }
       
-      console.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}`);
+      Debug.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}`);
       
       // Use the tool handler with our direct ObsidianAPI
       return await tool.handler(this.obsidianAPI, args);
@@ -161,7 +162,7 @@ export class MCPHttpServer {
 
     // Request logging for debugging
     this.app.use((req, res, next) => {
-      console.log(`📡 ${req.method} ${req.url}`, req.body ? JSON.stringify(req.body).substring(0, 200) : '');
+      Debug.log(`📡 ${req.method} ${req.url}`, req.body ? JSON.stringify(req.body).substring(0, 200) : '');
       next();
     });
   }
@@ -177,7 +178,7 @@ export class MCPHttpServer {
         timestamp: new Date().toISOString()
       };
       
-      console.log('📊 Health check requested');
+      Debug.log('📊 Health check requested');
       res.json(response);
     });
 
@@ -216,7 +217,7 @@ export class MCPHttpServer {
         transport.close();
         this.transports.delete(sessionId);
         this.connectionCount = Math.max(0, this.connectionCount - 1);
-        console.log(`🔚 Closed MCP session: ${sessionId} (Remaining: ${this.connectionCount})`);
+        Debug.log(`🔚 Closed MCP session: ${sessionId} (Remaining: ${this.connectionCount})`);
         res.status(200).json({ message: 'Session closed' });
       } else {
         res.status(404).json({ error: 'Session not found' });
@@ -227,7 +228,7 @@ export class MCPHttpServer {
   private async handleMCPRequest(req: any, res: any): Promise<void> {
     try {
       const request = req.body;
-      console.log('📨 MCP Request:', request.method, request.params);
+      Debug.log('📨 MCP Request:', request.method, request.params);
 
       // Get or create session ID
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -250,9 +251,9 @@ export class MCPHttpServer {
         // Store the transport for future requests
         this.transports.set(effectiveSessionId, transport);
         this.connectionCount++;
-        console.log(`🔗 New MCP connection: ${effectiveSessionId} (Total: ${this.connectionCount})`);
+        Debug.log(`🔗 New MCP connection: ${effectiveSessionId} (Total: ${this.connectionCount})`);
         
-        console.log(`🔗 Created new MCP session: ${effectiveSessionId}`);
+        Debug.log(`🔗 Created new MCP session: ${effectiveSessionId}`);
       } else {
         // Handle stateless requests or create temporary transport
         transport = new StreamableHTTPServerTransport({
@@ -269,10 +270,10 @@ export class MCPHttpServer {
       // Handle the request using the transport
       await transport.handleRequest(req, res, request);
       
-      console.log('📤 MCP Response sent via transport');
+      Debug.log('📤 MCP Response sent via transport');
 
     } catch (error) {
-      console.error('❌ MCP request error:', error);
+      Debug.error('❌ MCP request error:', error);
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',
@@ -289,7 +290,7 @@ export class MCPHttpServer {
 
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log(`MCP server already running on port ${this.port}`);
+      Debug.log(`MCP server already running on port ${this.port}`);
       return;
     }
 
@@ -298,15 +299,15 @@ export class MCPHttpServer {
       
       this.server.listen(this.port, () => {
         this.isRunning = true;
-        console.log(`🚀 MCP server started on http://localhost:${this.port}`);
-        console.log(`📍 Health check: http://localhost:${this.port}/`);
-        console.log(`🔗 MCP endpoint: http://localhost:${this.port}/mcp`);
+        Debug.log(`🚀 MCP server started on http://localhost:${this.port}`);
+        Debug.log(`📍 Health check: http://localhost:${this.port}/`);
+        Debug.log(`🔗 MCP endpoint: http://localhost:${this.port}/mcp`);
         resolve();
       });
 
       this.server.on('error', (error: any) => {
         this.isRunning = false;
-        console.error('❌ Failed to start MCP server:', error);
+        Debug.error('❌ Failed to start MCP server:', error);
         reject(error);
       });
     });
@@ -320,7 +321,7 @@ export class MCPHttpServer {
     // Clean up all active transports
     for (const [sessionId, transport] of this.transports) {
       transport.close();
-      console.log(`🔚 Closed MCP session on shutdown: ${sessionId}`);
+      Debug.log(`🔚 Closed MCP session on shutdown: ${sessionId}`);
     }
     this.transports.clear();
     this.connectionCount = 0; // Reset connection count on server stop
@@ -328,7 +329,7 @@ export class MCPHttpServer {
     return new Promise<void>((resolve) => {
       this.server?.close(() => {
         this.isRunning = false;
-        console.log('👋 MCP server stopped');
+        Debug.log('👋 MCP server stopped');
         resolve();
       });
     });
