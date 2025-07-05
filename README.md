@@ -66,7 +66,8 @@ Once this plugin is approved and available in the Obsidian Community Plugins dir
    ```
 
    ### Claude Desktop / Other Clients
-   Add to your configuration file:
+   
+   **Option 1: Direct HTTP Transport** (if your client supports it)
    ```json
    {
      "mcpServers": {
@@ -75,6 +76,23 @@ Once this plugin is approved and available in the Obsidian Community Plugins dir
            "type": "http",
            "url": "http://localhost:3001/mcp"
          }
+       }
+     }
+   }
+   ```
+   
+   **Option 2: Via mcp-remote** (recommended for Claude Desktop)
+   
+   Since Claude Desktop might not support streaming HTTP transport yet, use mcp-remote:
+   ```json
+   {
+     "mcpServers": {
+       "obsidian-vault-name": {
+         "command": "npx",
+         "args": [
+           "mcp-remote",
+           "http://localhost:3001/mcp"
+         ]
        }
      }
    }
