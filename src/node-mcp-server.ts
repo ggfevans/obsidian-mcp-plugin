@@ -110,7 +110,7 @@ export class NodeMCPServer {
 
   private async handleHealthCheck(req: any, res: any): Promise<void> {
     const response = {
-      name: 'obsidian-mcp-plugin',
+      name: 'Semantic Notes Vault MCP',
       version: '0.1.4',
       status: 'running',
       vault: this.app.vault.getName(),

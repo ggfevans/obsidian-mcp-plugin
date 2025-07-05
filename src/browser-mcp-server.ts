@@ -87,7 +87,7 @@ export class BrowserMCPServer {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        name: 'obsidian-mcp-plugin',
+        name: 'Semantic Notes Vault MCP',
         version: '0.1.3',
         status: 'running',
         vault: this.app.vault.getName(),

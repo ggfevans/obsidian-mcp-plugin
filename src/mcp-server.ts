@@ -42,7 +42,7 @@ export class MCPHttpServer {
     // Initialize MCP Server
     this.mcpServer = new MCPServer(
       {
-        name: 'obsidian-mcp-plugin',
+        name: 'Semantic Notes Vault MCP',
         version: getVersion()
       },
       {
@@ -170,7 +170,7 @@ export class MCPHttpServer {
     // Health check endpoint
     this.app.get('/', (req, res) => {
       const response = {
-        name: 'obsidian-mcp-plugin',
+        name: 'Semantic Notes Vault MCP',
         version: getVersion(),
         status: 'running',
         vault: this.obsidianApp.vault.getName(),
@@ -181,6 +181,26 @@ export class MCPHttpServer {
       res.json(response);
     });
 
+    // MCP discovery endpoints
+    this.app.get('/.well-known/appspecific/com.mcp.obsidian-mcp', (req, res) => {
+      res.json({
+        endpoint: `http://localhost:${this.port}/mcp`,
+        protocol: 'http',
+        method: 'POST',
+        contentType: 'application/json'
+      });
+    });
+
+    // GET endpoint for MCP info (for debugging)
+    this.app.get('/mcp', (req, res) => {
+      res.json({
+        message: 'MCP endpoint active',
+        usage: 'POST /mcp with MCP protocol messages',
+        protocol: 'Model Context Protocol',
+        transport: 'HTTP',
+        sessionHeader: 'Mcp-Session-Id'
+      });
+    });
 
     // MCP protocol endpoint - using StreamableHTTPServerTransport
     this.app.post('/mcp', async (req, res) => {
