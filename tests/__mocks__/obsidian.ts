@@ -1,5 +1,14 @@
 // Mock Obsidian API for testing
 
+export abstract class TAbstractFile {
+  path!: string;
+  name!: string;
+}
+
+export class TFile extends TAbstractFile {
+  extension!: string;
+}
+
 export class App {
   vault: Vault;
   workspace: Workspace;
