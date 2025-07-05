@@ -227,7 +227,7 @@ export default class ObsidianMCPPlugin extends Plugin {
 			port: this.settings.httpPort,
 			vaultName: this.app.vault.getName(),
 			vaultPath: this.getVaultPath(),
-			toolsCount: 5, // Our 5 semantic tools
+			toolsCount: 6, // Our 6 semantic tools (including graph)
 			resourcesCount: 1, // vault-info resource
 			connections: this.mcpServer?.getConnectionCount() || 0
 		};
@@ -361,7 +361,7 @@ class MCPSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Obsidian MCP Plugin Settings'});
+		containerEl.createEl('h2', {text: 'Semantic Notes Vault MCP Settings'});
 
 		// Connection Status Section
 		this.createConnectionStatusSection(containerEl);
@@ -543,10 +543,11 @@ class MCPSettingTab extends PluginSettingTab {
 			'✏️ edit - Smart editing with content buffers', 
 			'👁️ view - Content viewing and navigation',
 			'🔄 workflow - AI workflow guidance and suggestions',
+			'🕸️ graph - Graph traversal and link analysis',
 			'⚙️ system - System operations and web fetch'
 		];
 		
-		info.createEl('h4', {text: 'Available Tools (5)'});
+		info.createEl('h4', {text: 'Available Tools (6)'});
 		const toolsListEl = info.createEl('ul');
 		toolsList.forEach(tool => {
 			toolsListEl.createEl('li', {text: tool});
