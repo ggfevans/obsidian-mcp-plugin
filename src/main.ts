@@ -614,6 +614,8 @@ class MCPSettingTab extends PluginSettingTab {
 			text: 'Add this to your MCP client configuration file:'
 		});
 		
+		// Option 1: Direct HTTP Transport
+		info.createEl('p', {text: 'Option 1: Direct HTTP Transport (if supported by your client):'}).style.fontWeight = 'bold';
 		const configExample = info.createDiv('desktop-config-example');
 		const configEl = configExample.createEl('pre');
 		configEl.classList.add('mcp-config-example');
@@ -630,6 +632,31 @@ class MCPSettingTab extends PluginSettingTab {
 		};
 		
 		configEl.textContent = JSON.stringify(configJson, null, 2);
+		
+		// Option 2: Via mcp-remote
+		info.createEl('p', {text: 'Option 2: Via mcp-remote (recommended for Claude Desktop):'}).style.fontWeight = 'bold';
+		const remoteDesc = info.createEl('p', {
+			text: 'Claude Desktop may not support streaming HTTP transport yet. Use mcp-remote instead:',
+			cls: 'setting-item-description'
+		});
+		
+		const remoteExample = info.createDiv('desktop-config-example');
+		const remoteEl = remoteExample.createEl('pre');
+		remoteEl.classList.add('mcp-config-example');
+		
+		const remoteJson = {
+			"mcpServers": {
+				"obsidian-vault": {
+					"command": "npx",
+					"args": [
+						"mcp-remote",
+						`http://localhost:${this.plugin.settings.httpPort}/mcp`
+					]
+				}
+			}
+		};
+		
+		remoteEl.textContent = JSON.stringify(remoteJson, null, 2);
 		
 		const configPath = info.createEl('p', {
 			text: 'Configuration file location:'
