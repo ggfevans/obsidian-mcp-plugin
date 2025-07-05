@@ -599,9 +599,13 @@ class MCPSettingTab extends PluginSettingTab {
 			toolsListEl.createEl('li', {text: tool});
 		});
 		
-		info.createEl('h4', {text: 'Available Resources (1)'});
+		const resourceCount = this.plugin.settings.enableConcurrentSessions ? 2 : 1;
+		info.createEl('h4', {text: `Available Resources (${resourceCount})`});
 		const resourcesList = info.createEl('ul');
 		resourcesList.createEl('li', {text: '📊 obsidian://vault-info - Real-time vault metadata'});
+		if (this.plugin.settings.enableConcurrentSessions) {
+			resourcesList.createEl('li', {text: '🔄 obsidian://session-info - Active MCP sessions and statistics'});
+		}
 		
 		info.createEl('h4', {text: 'Claude Code Connection'});
 		const commandExample = info.createDiv('protocol-command-example');
