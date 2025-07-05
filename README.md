@@ -85,6 +85,34 @@ Once this plugin is approved and available in the Obsidian Community Plugins dir
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
    - Linux: `~/.config/Claude/claude_desktop_config.json`
 
+### Concurrent Sessions for Agent Swarms (v0.5.8+)
+
+Enable multiple AI agents to work with your vault simultaneously without blocking each other:
+
+1. **Enable in Settings**:
+   - Go to plugin settings
+   - Find "Concurrent Sessions" section
+   - Toggle "Enable Concurrent Sessions for Agent Swarms"
+   - Adjust max connections if needed (default: 32)
+
+2. **Architecture**:
+   - Each AI session gets its own isolated MCP server instance
+   - True parallel processing - no blocking between sessions
+   - Automatic session management with 1-hour timeout
+   - Session reuse for reconnecting clients
+
+3. **Monitor Active Sessions**:
+   - Use the `obsidian://session-info` resource to view:
+     - Active sessions with "This is you!" indicator
+     - Session age, idle time, and request counts
+     - Server pool utilization statistics
+
+4. **Use Cases**:
+   - Multiple Claude instances working on different parts of your vault
+   - AI agent teams collaborating on research or writing projects
+   - Parallel processing of large knowledge bases
+   - Non-blocking operation for time-sensitive workflows
+
 ## Available Tools
 
 ### 🗂️ `vault` - File and Folder Operations
