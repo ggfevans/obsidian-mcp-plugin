@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import { Worker } from 'worker_threads';
 import { randomUUID } from 'crypto';
 import { Debug } from './debug';
+import { WorkerManager } from './worker-manager';
+import * as path from 'path';
 
 export interface PooledRequest {
   id: string;
@@ -28,13 +30,12 @@ export interface ConnectionPoolOptions {
 
 /**
  * Connection pool manager for handling concurrent MCP requests
- * Uses a queue-based approach with configurable connection limits
+ * Uses worker threads for true parallel processing
  */
 export class ConnectionPool extends EventEmitter {
   protected activeConnections: Map<string, PooledRequest> = new Map();
   protected requestQueue: PooledRequest[] = [];
-  protected workers: Worker[] = [];
-  protected availableWorkers: Worker[] = [];
+  protected workerManager?: WorkerManager;
   protected options: ConnectionPoolOptions;
   protected isShuttingDown: boolean = false;
 
@@ -56,8 +57,17 @@ export class ConnectionPool extends EventEmitter {
   async initialize(): Promise<void> {
     Debug.log(`🏊 Initializing connection pool with ${this.options.maxConnections} max connections`);
     
-    // For now, we'll use a simpler approach without worker threads
-    // This can be enhanced later with actual worker threads for CPU-intensive operations
+    // Initialize worker manager
+    this.workerManager = new WorkerManager(this.options.workerScript);
+    
+    // Listen for worker events
+    this.workerManager.on('worker-ready', (sessionId) => {
+      Debug.log(`🎉 Worker ready for session ${sessionId}`);
+    });
+    
+    this.workerManager.on('worker-error', ({ sessionId, error }) => {
+      Debug.error(`💥 Worker error for session ${sessionId}:`, error);
+    });
   }
 
   /**
@@ -99,7 +109,7 @@ export class ConnectionPool extends EventEmitter {
   }
 
   /**
-   * Process queued requests
+   * Process queued requests using worker threads
    */
   protected processQueue(): void {
     while (
@@ -112,7 +122,67 @@ export class ConnectionPool extends EventEmitter {
       this.activeConnections.set(request.id, request);
       Debug.log(`🔄 Processing request ${request.id}. Active: ${this.activeConnections.size}/${this.options.maxConnections}`);
 
-      // Emit event for processing
+      // Check if this operation should use a worker
+      if (this.shouldUseWorker(request)) {
+        this.processWithWorker(request);
+      } else {
+        // Process on main thread
+        this.emit('process', request);
+      }
+    }
+  }
+
+  /**
+   * Check if this request should use a worker
+   */
+  private shouldUseWorker(request: PooledRequest): boolean {
+    if (!this.workerManager || !request.sessionId) {
+      return false;
+    }
+    
+    // List of CPU-intensive operations that benefit from workers
+    const workerOps = [
+      'tool.vault.search',
+      'tool.vault.fragments', 
+      'tool.graph.search-traverse',
+      'tool.graph.advanced-traverse'
+    ];
+    
+    return workerOps.some(op => request.method.includes(op));
+  }
+  
+  /**
+   * Process request with worker thread
+   */
+  private async processWithWorker(request: PooledRequest): Promise<void> {
+    if (!this.workerManager || !request.sessionId) {
+      // Fallback to main thread
+      this.emit('process', request);
+      return;
+    }
+    
+    try {
+      Debug.log(`🚀 Processing ${request.method} with worker for session ${request.sessionId}`);
+      
+      // Extract operation details from method
+      const [, , operation] = request.method.split('.');
+      
+      const result = await this.workerManager.submitTask({
+        id: request.id,
+        sessionId: request.sessionId,
+        operation,
+        data: request.params
+      });
+      
+      // Complete the request
+      this.completeRequest(request.id, {
+        id: request.id,
+        result: result.result
+      });
+    } catch (error) {
+      Debug.error(`❌ Worker processing failed for ${request.id}:`, error);
+      
+      // Fallback to main thread
       this.emit('process', request);
     }
   }
@@ -189,9 +259,9 @@ export class ConnectionPool extends EventEmitter {
       this.activeConnections.clear();
     }
 
-    // Clean up workers if we implement them
-    for (const worker of this.workers) {
-      await worker.terminate();
+    // Terminate all workers
+    if (this.workerManager) {
+      await this.workerManager.terminateAll();
     }
 
     Debug.log('👋 Connection pool shutdown complete');

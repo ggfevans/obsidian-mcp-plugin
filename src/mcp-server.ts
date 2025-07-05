@@ -101,6 +101,9 @@ export class MCPHttpServer {
           // Create session-specific API instance if needed
           const sessionAPI = this.getSessionAPI(request.sessionId);
           
+          // Check if this operation needs data preparation for worker threads
+          const preparedContext = await this.prepareWorkerContext(request);
+          
           // Execute tool with session context
           const result = await tool.handler(sessionAPI, request.params);
           
@@ -593,5 +596,57 @@ export class MCPHttpServer {
     // For now, return the same API instance
     // In the future, we could create session-specific instances with isolated state
     return this.obsidianAPI;
+  }
+
+  /**
+   * Prepare context data for worker thread operations
+   */
+  private async prepareWorkerContext(request: PooledRequest): Promise<any> {
+    // Only prepare context for worker-compatible operations
+    const workerOps = [
+      'tool.vault.search',
+      'tool.vault.fragments',
+      'tool.graph.search-traverse',
+      'tool.graph.advanced-traverse'
+    ];
+    
+    if (!workerOps.some(op => request.method.includes(op))) {
+      return undefined;
+    }
+    
+    Debug.log(`📦 Preparing worker context for ${request.method}`);
+    
+    // For search operations, we might need to pre-fetch file contents
+    if (request.method.includes('vault.search')) {
+      // This would be implemented based on the specific needs
+      // For now, return undefined to use main thread
+      return undefined;
+    }
+    
+    // For graph operations, we need file contents and link graph
+    if (request.method.includes('graph.search-traverse')) {
+      try {
+        const startPath = request.params.startPath;
+        if (!startPath) return undefined;
+        
+        // Pre-fetch relevant file contents and link graph
+        // This is a simplified version - in production, we'd optimize this
+        const fileContents: Record<string, string> = {};
+        const linkGraph: Record<string, string[]> = {};
+        
+        // Get initial file and its links
+        const file = this.obsidianApp.vault.getAbstractFileByPath(startPath);
+        if (!file || !('extension' in file)) return undefined;
+        
+        // This would need more sophisticated pre-fetching logic
+        // For now, return undefined to use main thread
+        return undefined;
+      } catch (error) {
+        Debug.error('Failed to prepare worker context:', error);
+        return undefined;
+      }
+    }
+    
+    return undefined;
   }
 }

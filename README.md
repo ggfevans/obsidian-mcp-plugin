@@ -13,6 +13,8 @@ This plugin brings MCP capabilities directly into Obsidian, eliminating the need
 - **Semantic Operations**: Enhanced search with Obsidian operators, intelligent fragment retrieval, and workflow guidance
 - **No External Dependencies**: No need for the REST API plugin or external servers
 - **High Performance**: Sub-100ms response times with direct vault access
+- **Concurrent Sessions**: Support for multiple AI agents working simultaneously (v0.5.8+)
+- **Worker Thread Processing**: CPU-intensive operations run in parallel threads for non-blocking performance
 
 ## Installation
 
@@ -141,9 +143,37 @@ Once this plugin is approved and available in the Obsidian Community Plugins dir
 - **commands** - List and execute Obsidian commands
 - **fetch_web** - Fetch and convert web content to markdown
 
+## Configuration
+
+### Plugin Settings
+
+Access plugin settings via Obsidian Settings → Community Plugins → Obsidian MCP Plugin → Settings
+
+- **HTTP Port**: Port for MCP server (default: 3001)
+- **Enable Concurrent Sessions**: Allow multiple AI agents to work simultaneously (default: enabled)
+- **Max Concurrent Connections**: Maximum number of parallel operations (default: 32)
+- **Debug Logging**: Enable detailed console logging for troubleshooting
+
+### Concurrent Sessions (v0.5.8+)
+
+The plugin supports multiple AI agents working simultaneously through session-based connection pooling:
+
+- Each MCP client gets a unique session ID
+- Sessions are isolated and tracked independently
+- CPU-intensive operations (search, graph traversal) can run in parallel
+- Worker threads prevent blocking the main Obsidian UI
+- Sessions automatically expire after 1 hour of inactivity
+
+**Performance with Concurrent Sessions**:
+- Up to 32 simultaneous operations (configurable)
+- Worker threads for CPU-intensive tasks
+- Non-blocking UI during heavy operations
+- Automatic session cleanup and resource management
+
 ## MCP Resources
 
 - **`obsidian://vault-info`** - Real-time vault metadata including file counts, active file, and plugin status
+- **`obsidian://session-info`** - Active sessions and connection pool statistics (when concurrent sessions enabled)
 
 ## Key Improvements Over External MCP Servers
 
