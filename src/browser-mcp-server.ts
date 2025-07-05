@@ -1,4 +1,5 @@
 import { App } from 'obsidian';
+import { Debug } from './utils/debug';
 
 interface MCPRequest {
   method: string;
@@ -28,7 +29,7 @@ export class BrowserMCPServer {
 
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log(`MCP server already running on port ${this.port}`);
+      Debug.log(`MCP server already running on port ${this.port}`);
       return;
     }
 
@@ -48,12 +49,12 @@ export class BrowserMCPServer {
       this.setupMCPEndpoints();
 
       this.isRunning = true;
-      console.log(`🚀 MCP server started on http://localhost:${this.port}`);
-      console.log(`📍 Health check: http://localhost:${this.port}/`);
-      console.log(`🔗 MCP endpoint: http://localhost:${this.port}/mcp`);
+      Debug.log(`🚀 MCP server started on http://localhost:${this.port}`);
+      Debug.log(`📍 Health check: http://localhost:${this.port}/`);
+      Debug.log(`🔗 MCP endpoint: http://localhost:${this.port}/mcp`);
 
     } catch (error) {
-      console.error('❌ Failed to start MCP server:', error);
+      Debug.error('❌ Failed to start MCP server:', error);
       throw error;
     }
   }
@@ -65,7 +66,7 @@ export class BrowserMCPServer {
 
     this.isRunning = false;
     this.server = undefined;
-    console.log('👋 MCP server stopped');
+    Debug.log('👋 MCP server stopped');
   }
 
   private setupMCPEndpoints(): void {

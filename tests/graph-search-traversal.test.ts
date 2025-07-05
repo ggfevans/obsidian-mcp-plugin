@@ -31,8 +31,8 @@ describe('GraphSearchTraversal', () => {
     describe('searchTraverse', () => {
         it('should traverse graph and return snippet chain', async () => {
             // Mock file structure
-            const mockFile1 = { path: 'note1.md', extension: 'md', name: 'note1.md' } as TFile;
-            const mockFile2 = { path: 'note2.md', extension: 'md', name: 'note2.md' } as TFile;
+            const mockFile1 = Object.assign(Object.create(TFile.prototype), { path: 'note1.md', extension: 'md', name: 'note1.md' });
+            const mockFile2 = Object.assign(Object.create(TFile.prototype), { path: 'note2.md', extension: 'md', name: 'note2.md' });
             
             // Mock vault methods
             mockApp.vault.getAbstractFileByPath = jest.fn()
@@ -74,7 +74,7 @@ describe('GraphSearchTraversal', () => {
         });
 
         it('should respect score threshold', async () => {
-            const mockFile = { path: 'note1.md', extension: 'md', name: 'note1.md' } as TFile;
+            const mockFile = Object.assign(Object.create(TFile.prototype), { path: 'note1.md', extension: 'md', name: 'note1.md' });
             
             mockApp.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFile);
             mockApp.vault.read = jest.fn().mockResolvedValue('This document has no relevant content');
@@ -94,8 +94,8 @@ describe('GraphSearchTraversal', () => {
         });
 
         it('should handle circular references', async () => {
-            const mockFile1 = { path: 'note1.md', extension: 'md', name: 'note1.md' } as TFile;
-            const mockFile2 = { path: 'note2.md', extension: 'md', name: 'note2.md' } as TFile;
+            const mockFile1 = Object.assign(Object.create(TFile.prototype), { path: 'note1.md', extension: 'md', name: 'note1.md' });
+            const mockFile2 = Object.assign(Object.create(TFile.prototype), { path: 'note2.md', extension: 'md', name: 'note2.md' });
             
             // Create circular reference
             mockApp.vault.getAbstractFileByPath = jest.fn()

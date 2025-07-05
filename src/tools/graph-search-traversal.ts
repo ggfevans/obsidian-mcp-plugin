@@ -67,11 +67,11 @@ export class GraphSearchTraversal {
 
             // Get the file
             const file = this.app.vault.getAbstractFileByPath(currentPath);
-            // Check if it's a file (not a folder) by checking for extension property
-            if (!file || !('extension' in file)) continue;
+            // Check if it's a file (not a folder) using instanceof
+            if (!file || !(file instanceof TFile)) continue;
 
             // Search within this document
-            const snippets = await this.searchInFile(file as TFile, searchQuery, maxSnippetsPerNode);
+            const snippets = await this.searchInFile(file, searchQuery, maxSnippetsPerNode);
             
             // Only include nodes with snippets above threshold
             const highScoreSnippets = snippets.filter(s => s.score >= scoreThreshold);
@@ -87,7 +87,7 @@ export class GraphSearchTraversal {
 
                 // Only continue traversal from nodes with good matches
                 if (depth < maxDepth) {
-                    const links = await this.getLinkedPaths(file as TFile);
+                    const links = await this.getLinkedPaths(file);
                     for (const linkedPath of links) {
                         if (!visited.has(linkedPath)) {
                             queue.push([linkedPath, depth + 1, currentPath]);

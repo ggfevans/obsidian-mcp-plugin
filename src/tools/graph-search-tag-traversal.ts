@@ -100,11 +100,11 @@ export class GraphSearchTagTraversal extends GraphSearchTraversal {
 
             // Get the file
             const file = this.app.vault.getAbstractFileByPath(currentPath);
-            // Check if it's a file (not a folder) by checking for extension property
-            if (!file || !('extension' in file)) continue;
+            // Check if it's a file (not a folder) using instanceof
+            if (!file || !(file instanceof TFile)) continue;
 
             // Search within this document
-            const snippets = await this.searchInFile(file as TFile, searchQuery, maxSnippetsPerNode);
+            const snippets = await this.searchInFile(file, searchQuery, maxSnippetsPerNode);
             
             // Apply tag weight if this was reached via tag connection
             const adjustedSnippets = connectionType === 'tag' 
@@ -127,13 +127,13 @@ export class GraphSearchTagTraversal extends GraphSearchTraversal {
                 // Only continue traversal from nodes with good matches
                 if (depth < maxDepth) {
                     // Get both link and tag connections
-                    const links = await this.getLinkedPathsWithTags(file as TFile, followTags);
+                    const links = await this.getLinkedPathsWithTags(file, followTags);
                     
                     // For each linked path, determine if it's a tag or link connection
                     for (const linkedPath of links) {
                         if (!visited.has(linkedPath)) {
                             // Check if this is a normal link or tag connection
-                            const normalLinks = await this.getLinkedPaths(file as TFile);
+                            const normalLinks = await this.getLinkedPaths(file);
                             const isTagConnection = !normalLinks.includes(linkedPath);
                             
                             if (isTagConnection) {
@@ -172,12 +172,12 @@ export class GraphSearchTagTraversal extends GraphSearchTraversal {
         const file1 = this.app.vault.getAbstractFileByPath(path1);
         const file2 = this.app.vault.getAbstractFileByPath(path2);
         
-        if (!file1 || !file2 || !('extension' in file1) || !('extension' in file2)) {
+        if (!file1 || !file2 || !(file1 instanceof TFile) || !(file2 instanceof TFile)) {
             return [];
         }
         
-        const cache1 = this.app.metadataCache.getFileCache(file1 as TFile);
-        const cache2 = this.app.metadataCache.getFileCache(file2 as TFile);
+        const cache1 = this.app.metadataCache.getFileCache(file1);
+        const cache2 = this.app.metadataCache.getFileCache(file2);
         
         if (!cache1?.tags || !cache2?.tags) {
             return [];
