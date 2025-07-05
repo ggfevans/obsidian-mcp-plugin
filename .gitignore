@@ -121,3 +121,6 @@ dist
 main.js
 *.js.map
 data.json
+
+# Test scripts
+test-concurrent-sessions.js

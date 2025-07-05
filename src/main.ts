@@ -9,6 +9,8 @@ interface MCPPluginSettings {
 	debugLogging: boolean;
 	showConnectionStatus: boolean;
 	autoDetectPortConflicts: boolean;
+	enableConcurrentSessions: boolean;
+	maxConcurrentConnections: number;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -16,7 +18,9 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	httpPort: 3001,
 	debugLogging: false,
 	showConnectionStatus: true,
-	autoDetectPortConflicts: true
+	autoDetectPortConflicts: true,
+	enableConcurrentSessions: false, // Disabled by default for backward compatibility
+	maxConcurrentConnections: 32
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
@@ -223,6 +227,9 @@ export default class ObsidianMCPPlugin extends Plugin {
 	}
 
 	getMCPServerInfo(): any {
+		const poolStats = this.mcpServer?.getConnectionPoolStats();
+		const resourceCount = this.settings.enableConcurrentSessions ? 2 : 1; // vault-info + session-info
+		
 		return {
 			version: getVersion(),
 			running: this.mcpServer?.isServerRunning() || false,
@@ -230,8 +237,10 @@ export default class ObsidianMCPPlugin extends Plugin {
 			vaultName: this.app.vault.getName(),
 			vaultPath: this.getVaultPath(),
 			toolsCount: 6, // Our 6 semantic tools (including graph)
-			resourcesCount: 1, // vault-info resource
-			connections: this.mcpServer?.getConnectionCount() || 0
+			resourcesCount: resourceCount,
+			connections: this.mcpServer?.getConnectionCount() || 0,
+			concurrentSessions: this.settings.enableConcurrentSessions,
+			poolStats: poolStats
 		};
 	}
 
@@ -402,7 +411,19 @@ class MCPSettingTab extends PluginSettingTab {
 			}
 			createStatusItem('Version', info.version);
 			createStatusItem('Tools', info.toolsCount.toString());
+			createStatusItem('Resources', info.resourcesCount.toString());
 			createStatusItem('Connections', info.connections.toString());
+			
+			// Show pool stats if concurrent sessions are enabled
+			if (info.concurrentSessions && info.poolStats?.enabled && info.poolStats.stats) {
+				const poolStats = info.poolStats.stats;
+				createStatusItem('Active Sessions', `${poolStats.activeConnections}/${poolStats.maxConnections}`);
+				createStatusItem('Pool Utilization', `${Math.round(poolStats.utilization * 100)}%`, 
+					poolStats.utilization > 0.8 ? 'warning' : 'success');
+				if (poolStats.queuedRequests > 0) {
+					createStatusItem('Queued Requests', poolStats.queuedRequests.toString(), 'warning');
+				}
+			}
 		} else {
 			statusEl.createDiv({text: 'Server not running', cls: 'mcp-status-offline'});
 		}
@@ -526,6 +547,36 @@ class MCPSettingTab extends PluginSettingTab {
 					Debug.setDebugMode(value);
 					await this.plugin.saveSettings();
 				}));
+
+		containerEl.createEl('h3', {text: 'Concurrent Sessions'});
+
+		new Setting(containerEl)
+			.setName('Enable Concurrent Sessions for Agent Swarms')
+			.setDesc('Allow multiple MCP clients to connect simultaneously. Required for agent swarms and multi-client setups.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableConcurrentSessions)
+				.onChange(async (value) => {
+					this.plugin.settings.enableConcurrentSessions = value;
+					await this.plugin.saveSettings();
+					
+					// Show notice about restart requirement
+					new Notice('Server restart required for concurrent session changes to take effect');
+				}));
+
+		new Setting(containerEl)
+			.setName('Maximum Concurrent Connections')
+			.setDesc('Maximum number of simultaneous connections allowed (1-100, default: 32)')
+			.addText(text => text
+				.setPlaceholder('32')
+				.setValue(this.plugin.settings.maxConcurrentConnections.toString())
+				.onChange(async (value) => {
+					const num = parseInt(value);
+					if (!isNaN(num) && num >= 1 && num <= 100) {
+						this.plugin.settings.maxConcurrentConnections = num;
+						await this.plugin.saveSettings();
+					}
+				}))
+			.setDisabled(!this.plugin.settings.enableConcurrentSessions);
 	}
 
 	private createProtocolInfoSection(containerEl: HTMLElement): void {

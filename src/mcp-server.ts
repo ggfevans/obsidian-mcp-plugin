@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { App } from 'obsidian';
+import { App, Notice } from 'obsidian';
 import { createServer, Server } from 'http';
 import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -18,6 +18,8 @@ import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
 import { semanticTools } from './tools/semantic-tools';
 import { Debug } from './utils/debug';
+import { ConnectionPool, PooledRequest } from './utils/connection-pool';
+import { SessionManager } from './utils/session-manager';
 
 
 export class MCPHttpServer {
@@ -31,6 +33,8 @@ export class MCPHttpServer {
   private isRunning: boolean = false;
   private connectionCount: number = 0;
   private plugin?: any; // Reference to the plugin
+  private connectionPool?: ConnectionPool;
+  private sessionManager?: SessionManager;
 
   constructor(obsidianApp: App, port: number = 3001, plugin?: any) {
     this.obsidianApp = obsidianApp;
@@ -39,6 +43,81 @@ export class MCPHttpServer {
     
     // Initialize ObsidianAPI with direct plugin access
     this.obsidianAPI = new ObsidianAPI(obsidianApp, undefined, plugin);
+    
+    // Initialize connection pool and session manager if concurrent sessions are enabled
+    if (plugin?.settings?.enableConcurrentSessions) {
+      const maxConnections = plugin.settings.maxConcurrentConnections || 32;
+      
+      // Initialize session manager
+      this.sessionManager = new SessionManager({
+        maxSessions: maxConnections,
+        sessionTimeout: 3600000, // 1 hour
+        checkInterval: 60000 // Check every minute
+      });
+      this.sessionManager.start();
+      
+      // Handle session events
+      this.sessionManager.on('session-evicted', ({ session, reason }) => {
+        // Clean up transport for evicted session
+        const transport = this.transports.get(session.sessionId);
+        if (transport) {
+          transport.close();
+          this.transports.delete(session.sessionId);
+          this.connectionCount = Math.max(0, this.connectionCount - 1);
+          Debug.log(`🔚 Evicted session ${session.sessionId} (${reason}). Connections: ${this.connectionCount}`);
+        }
+      });
+      
+      // Initialize connection pool
+      this.connectionPool = new ConnectionPool({
+        maxConnections,
+        maxQueueSize: 100,
+        requestTimeout: 30000,
+        sessionTimeout: 3600000,
+        sessionCheckInterval: 60000
+      });
+      this.connectionPool.initialize();
+      
+      // Set up connection pool request processing
+      this.connectionPool.on('process', async (request: PooledRequest) => {
+        try {
+          // Touch session to update activity
+          if (request.sessionId && this.sessionManager) {
+            this.sessionManager.touchSession(request.sessionId);
+          }
+          
+          // Extract tool name from method
+          const toolName = request.method.replace('tool.', '');
+          const tool = semanticTools.find(t => t.name === toolName);
+          
+          if (!tool) {
+            this.connectionPool!.completeRequest(request.id, {
+              id: request.id,
+              error: new Error(`Tool not found: ${toolName}`)
+            });
+            return;
+          }
+          
+          // Create session-specific API instance if needed
+          const sessionAPI = this.getSessionAPI(request.sessionId);
+          
+          // Execute tool with session context
+          const result = await tool.handler(sessionAPI, request.params);
+          
+          this.connectionPool!.completeRequest(request.id, {
+            id: request.id,
+            result
+          });
+        } catch (error) {
+          this.connectionPool!.completeRequest(request.id, {
+            id: request.id,
+            error
+          });
+        }
+      });
+      
+      Debug.log(`🏊 Connection pool initialized with max ${maxConnections} connections`);
+    }
     
     // Initialize MCP Server
     this.mcpServer = new MCPServer(
@@ -73,7 +152,7 @@ export class MCPHttpServer {
     });
 
     // Handle tool calls
-    this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
+    this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request, context): Promise<CallToolResult> => {
       const { name, arguments: args } = request.params;
       
       const tool = semanticTools.find(t => t.name === name);
@@ -81,28 +160,63 @@ export class MCPHttpServer {
         throw new Error(`Tool not found: ${name}`);
       }
       
-      Debug.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}`);
+      // Extract session ID from context if available
+      const sessionId = (context as any)?.sessionId;
       
-      // Use the tool handler with our direct ObsidianAPI
+      Debug.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}${sessionId ? ` (session: ${sessionId})` : ''}`);
+      
+      // If connection pooling is enabled and we have a session, use the pool
+      if (this.connectionPool && sessionId) {
+        const pooledRequest: PooledRequest = {
+          id: randomUUID(),
+          sessionId,
+          method: `tool.${name}`,
+          params: args,
+          timestamp: Date.now()
+        };
+        
+        // Check if we're at max connections
+        const stats = this.connectionPool.getStats();
+        if (stats.activeConnections >= stats.maxConnections) {
+          Debug.error(`❌ Max concurrent connections reached (${stats.maxConnections}). Request queued.`);
+          new Notice(`Max concurrent connections (${stats.maxConnections}) reached. Request queued.`);
+        }
+        
+        // Submit to pool for processing
+        const response = await this.connectionPool.submitRequest(pooledRequest);
+        return response.result;
+      }
+      
+      // Otherwise use direct execution
       return await tool.handler(this.obsidianAPI, args);
     });
 
     // Handle resource listing
     this.mcpServer.setRequestHandler(ListResourcesRequestSchema, async () => {
-      return {
-        resources: [
-          {
-            uri: 'obsidian://vault-info',
-            name: 'Vault Information',
-            description: 'Current vault status, file counts, and metadata',
-            mimeType: 'application/json'
-          }
-        ]
-      };
+      const resources = [
+        {
+          uri: 'obsidian://vault-info',
+          name: 'Vault Information',
+          description: 'Current vault status, file counts, and metadata',
+          mimeType: 'application/json'
+        }
+      ];
+      
+      // Add session info resource if concurrent sessions are enabled
+      if (this.sessionManager) {
+        resources.push({
+          uri: 'obsidian://session-info',
+          name: 'Session Information',
+          description: 'Active MCP sessions and connection pool statistics',
+          mimeType: 'application/json'
+        });
+      }
+      
+      return { resources };
     });
 
     // Handle resource reading
-    this.mcpServer.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    this.mcpServer.setRequestHandler(ReadResourceRequestSchema, async (request, context) => {
       const { uri } = request.params;
       
       if (uri === 'obsidian://vault-info') {
@@ -140,6 +254,71 @@ export class MCPHttpServer {
             uri,
             mimeType: 'application/json',
             text: JSON.stringify(vaultInfo, null, 2)
+          }]
+        };
+      }
+      
+      if (uri === 'obsidian://session-info' && this.sessionManager) {
+        // Get current session ID from context
+        const currentSessionId = (context as any)?.sessionId;
+        
+        // Get all sessions
+        const sessions = this.sessionManager.getAllSessions();
+        const sessionStats = this.sessionManager.getStats();
+        const poolStats = this.connectionPool?.getStats();
+        
+        // Format session data
+        const sessionData = sessions.map(session => {
+          const idleTime = Date.now() - session.lastActivityAt;
+          const age = Date.now() - session.createdAt;
+          
+          return {
+            sessionId: session.sessionId,
+            isCurrentSession: session.sessionId === currentSessionId,
+            createdAt: new Date(session.createdAt).toISOString(),
+            lastActivityAt: new Date(session.lastActivityAt).toISOString(),
+            requestCount: session.requestCount,
+            ageSeconds: Math.round(age / 1000),
+            idleSeconds: Math.round(idleTime / 1000),
+            status: session.sessionId === currentSessionId ? '🟢 This is you!' : '🔵 Active'
+          };
+        });
+        
+        // Sort sessions - current session first, then by last activity
+        sessionData.sort((a, b) => {
+          if (a.isCurrentSession) return -1;
+          if (b.isCurrentSession) return 1;
+          return b.lastActivityAt.localeCompare(a.lastActivityAt);
+        });
+        
+        const sessionInfo = {
+          summary: {
+            activeSessions: sessionStats.activeSessions,
+            maxSessions: sessionStats.maxSessions,
+            utilization: `${Math.round((sessionStats.activeSessions / sessionStats.maxSessions) * 100)}%`,
+            totalRequests: sessionStats.totalRequests,
+            oldestSessionAge: `${Math.round(sessionStats.oldestSessionAge / 1000)}s`,
+            newestSessionAge: `${Math.round(sessionStats.newestSessionAge / 1000)}s`
+          },
+          connectionPool: poolStats ? {
+            activeConnections: poolStats.activeConnections,
+            queuedRequests: poolStats.queuedRequests,
+            maxConnections: poolStats.maxConnections,
+            poolUtilization: `${Math.round(poolStats.utilization * 100)}%`
+          } : null,
+          sessions: sessionData,
+          settings: {
+            sessionTimeout: '1 hour',
+            maxConcurrentConnections: this.plugin?.settings?.maxConcurrentConnections || 32
+          },
+          timestamp: new Date().toISOString()
+        };
+        
+        return {
+          contents: [{
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(sessionInfo, null, 2)
           }]
         };
       }
@@ -228,16 +407,36 @@ export class MCPHttpServer {
   private async handleMCPRequest(req: any, res: any): Promise<void> {
     try {
       const request = req.body;
-      Debug.log('📨 MCP Request:', request.method, request.params);
-
+      
       // Get or create session ID
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      Debug.log(`📨 MCP Request: ${request.method}${sessionId ? ` [Session: ${sessionId}]` : ''}`, request.params);
       let transport: StreamableHTTPServerTransport;
       let effectiveSessionId = sessionId;
 
       if (sessionId && this.transports.has(sessionId)) {
         // Use existing transport for this session
         transport = this.transports.get(sessionId)!;
+        
+        // Update session activity if manager is enabled
+        if (this.sessionManager) {
+          this.sessionManager.touchSession(sessionId);
+        }
+      } else if (sessionId && this.sessionManager) {
+        // Session ID provided but transport not found - check if it's a valid reused session
+        const session = this.sessionManager.getOrCreateSession(sessionId);
+        
+        // Create new transport for the reused session
+        effectiveSessionId = sessionId;
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => effectiveSessionId!
+        });
+        
+        await this.mcpServer.connect(transport);
+        this.transports.set(effectiveSessionId, transport);
+        this.connectionCount++;
+        
+        Debug.log(`♻️ Reused session ${sessionId} (requests: ${session.requestCount})`);
       } else if (!sessionId && isInitializeRequest(request)) {
         // New initialization request - create new transport with session
         effectiveSessionId = randomUUID();
@@ -251,9 +450,13 @@ export class MCPHttpServer {
         // Store the transport for future requests
         this.transports.set(effectiveSessionId, transport);
         this.connectionCount++;
-        Debug.log(`🔗 New MCP connection: ${effectiveSessionId} (Total: ${this.connectionCount})`);
         
-        Debug.log(`🔗 Created new MCP session: ${effectiveSessionId}`);
+        // Register session with manager if enabled
+        if (this.sessionManager) {
+          this.sessionManager.getOrCreateSession(effectiveSessionId);
+        }
+        
+        Debug.log(`🔗 Created new MCP session: ${effectiveSessionId} (Total: ${this.connectionCount}`);
       } else {
         // Handle stateless requests or create temporary transport
         transport = new StreamableHTTPServerTransport({
@@ -326,6 +529,16 @@ export class MCPHttpServer {
     this.transports.clear();
     this.connectionCount = 0; // Reset connection count on server stop
 
+    // Shutdown session manager if it exists
+    if (this.sessionManager) {
+      this.sessionManager.stop();
+    }
+
+    // Shutdown connection pool if it exists
+    if (this.connectionPool) {
+      await this.connectionPool.shutdown();
+    }
+
     return new Promise<void>((resolve) => {
       this.server?.close(() => {
         this.isRunning = false;
@@ -345,5 +558,40 @@ export class MCPHttpServer {
 
   getConnectionCount(): number {
     return this.connectionCount;
+  }
+
+  /**
+   * Get connection pool statistics
+   */
+  getConnectionPoolStats(): {
+    enabled: boolean;
+    stats?: {
+      activeConnections: number;
+      queuedRequests: number;
+      maxConnections: number;
+      utilization: number;
+    };
+  } {
+    if (!this.connectionPool) {
+      return { enabled: false };
+    }
+
+    return {
+      enabled: true,
+      stats: this.connectionPool.getStats()
+    };
+  }
+
+  /**
+   * Get or create a session-specific API instance
+   */
+  private getSessionAPI(sessionId?: string): ObsidianAPI {
+    if (!sessionId) {
+      return this.obsidianAPI;
+    }
+
+    // For now, return the same API instance
+    // In the future, we could create session-specific instances with isolated state
+    return this.obsidianAPI;
   }
 }
