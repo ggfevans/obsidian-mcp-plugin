@@ -5,18 +5,14 @@ import { getVersion } from './version';
 interface MCPPluginSettings {
 	httpEnabled: boolean;
 	httpPort: number;
-	httpsPort: number;
-	enableSSL: boolean;
 	debugLogging: boolean;
 	showConnectionStatus: boolean;
 	autoDetectPortConflicts: boolean;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
-	httpEnabled: false, // Start disabled to avoid server startup issues
+	httpEnabled: true, // Start enabled by default
 	httpPort: 3001,
-	httpsPort: 3002,
-	enableSSL: false,
 	debugLogging: false,
 	showConnectionStatus: true,
 	autoDetectPortConflicts: true
@@ -61,9 +57,11 @@ export default class ObsidianMCPPlugin extends Plugin {
 			// Setup vault monitoring
 			this.setupVaultMonitoring();
 
-			// Start MCP server if enabled
+			// Start MCP server by default (unless explicitly disabled)
 			if (this.settings.httpEnabled) {
 				await this.startMCPServer();
+			} else {
+				console.log('⚠️ MCP server is disabled in settings');
 			}
 
 			// Add status bar item
@@ -98,13 +96,22 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 	async startMCPServer(): Promise<void> {
 		try {
-			// Check for port conflicts if enabled
+			// Check for port conflicts and auto-switch if needed
 			if (this.settings.autoDetectPortConflicts) {
 				const status = await this.checkPortConflict(this.settings.httpPort);
 				if (status === 'in-use') {
 					const suggestedPort = await this.findAvailablePort(this.settings.httpPort);
-					new Notice(`Port ${this.settings.httpPort} is in use. Try port ${suggestedPort}`);
+					console.log(`⚠️ Port ${this.settings.httpPort} is in use, trying port ${suggestedPort}`);
+					new Notice(`Port ${this.settings.httpPort} is in use. Switching to port ${suggestedPort}`);
+					
+					// Temporarily use the suggested port for this session
+					this.mcpServer = new MCPHttpServer(this.app, suggestedPort, this);
+					await this.mcpServer.start();
 					this.updateStatusBar();
+					console.log(`✅ MCP server started on alternate port ${suggestedPort}`);
+					if (this.settings.showConnectionStatus) {
+						new Notice(`MCP server started on port ${suggestedPort} (default port was in use)`);
+					}
 					return;
 				}
 			}
@@ -392,13 +399,23 @@ class MCPSettingTab extends PluginSettingTab {
 		containerEl.createEl('h3', {text: 'Server Configuration'});
 
 		new Setting(containerEl)
-			.setName('Enable HTTP Server')
-			.setDesc('Enable the HTTP server for MCP access (requires restart)')
+			.setName('MCP Server')
+			.setDesc('The MCP server starts automatically when the plugin loads')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.httpEnabled)
 				.onChange(async (value) => {
 					this.plugin.settings.httpEnabled = value;
 					await this.plugin.saveSettings();
+					
+					// Apply changes immediately
+					if (value) {
+						await this.plugin.startMCPServer();
+					} else {
+						await this.plugin.stopMCPServer();
+					}
+					
+					// Update the status display
+					this.display();
 				}));
 
 		const portSetting = new Setting(containerEl)
