@@ -14,18 +14,22 @@ import {
   type Tool
 } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'crypto';
+import * as path from 'path';
 import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
 import { semanticTools } from './tools/semantic-tools';
 import { Debug } from './utils/debug';
 import { ConnectionPool, PooledRequest } from './utils/connection-pool';
 import { SessionManager } from './utils/session-manager';
+import { WorkerManager } from './utils/worker-manager';
+import { MCPServerPool } from './utils/mcp-server-pool';
 
 
 export class MCPHttpServer {
   private app: express.Application;
   private server?: Server;
-  private mcpServer: MCPServer;
+  private mcpServer?: MCPServer; // Single server for non-concurrent mode
+  private mcpServerPool?: MCPServerPool; // Server pool for concurrent mode
   private transports: Map<string, StreamableHTTPServerTransport> = new Map();
   private obsidianApp: App;
   private obsidianAPI: ObsidianAPI;
@@ -74,7 +78,8 @@ export class MCPHttpServer {
         maxQueueSize: 100,
         requestTimeout: 30000,
         sessionTimeout: 3600000,
-        sessionCheckInterval: 60000
+        sessionCheckInterval: 60000,
+        workerScript: path.join(plugin.manifest.dir, 'dist', 'workers', 'semantic-worker.js')
       });
       this.connectionPool.initialize();
       
@@ -119,30 +124,40 @@ export class MCPHttpServer {
         }
       });
       
+      // Initialize MCP Server Pool for concurrent sessions
+      this.mcpServerPool = new MCPServerPool(this.obsidianAPI, maxConnections, plugin);
+      
+      // Set contexts for session-info resource
+      this.mcpServerPool.setContexts(this.sessionManager, this.connectionPool);
+      
       Debug.log(`🏊 Connection pool initialized with max ${maxConnections} connections`);
+    } else {
+      // Initialize single MCP Server for non-concurrent mode
+      this.mcpServer = new MCPServer(
+        {
+          name: 'Semantic Notes Vault MCP',
+          version: getVersion()
+        },
+        {
+          capabilities: {
+            tools: {},
+            resources: {}
+          }
+        }
+      );
+      this.setupMCPHandlers();
     }
     
-    // Initialize MCP Server
-    this.mcpServer = new MCPServer(
-      {
-        name: 'Semantic Notes Vault MCP',
-        version: getVersion()
-      },
-      {
-        capabilities: {
-          tools: {},
-          resources: {}
-        }
-      }
-    );
-
-    this.setupMCPHandlers();
     this.app = express();
     this.setupMiddleware();
     this.setupRoutes();
   }
 
   private setupMCPHandlers(): void {
+    // Only set up handlers for non-concurrent mode
+    // In concurrent mode, each server in the pool has its own handlers
+    if (!this.mcpServer) return;
+    
     // Register semantic tools following the proven pattern from obsidian-semantic-mcp
     this.mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -163,34 +178,7 @@ export class MCPHttpServer {
         throw new Error(`Tool not found: ${name}`);
       }
       
-      // Extract session ID from context if available
-      const sessionId = (context as any)?.sessionId;
-      
-      Debug.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}${sessionId ? ` (session: ${sessionId})` : ''}`);
-      
-      // If connection pooling is enabled and we have a session, use the pool
-      if (this.connectionPool && sessionId) {
-        const pooledRequest: PooledRequest = {
-          id: randomUUID(),
-          sessionId,
-          method: `tool.${name}`,
-          params: args,
-          timestamp: Date.now()
-        };
-        
-        // Check if we're at max connections
-        const stats = this.connectionPool.getStats();
-        if (stats.activeConnections >= stats.maxConnections) {
-          Debug.error(`❌ Max concurrent connections reached (${stats.maxConnections}). Request queued.`);
-          new Notice(`Max concurrent connections (${stats.maxConnections}) reached. Request queued.`);
-        }
-        
-        // Submit to pool for processing
-        const response = await this.connectionPool.submitRequest(pooledRequest);
-        return response.result;
-      }
-      
-      // Otherwise use direct execution
+      Debug.log(`🔧 Executing semantic tool: ${name} with action: ${args?.action}`);
       return await tool.handler(this.obsidianAPI, args);
     });
 
@@ -204,16 +192,6 @@ export class MCPHttpServer {
           mimeType: 'application/json'
         }
       ];
-      
-      // Add session info resource if concurrent sessions are enabled
-      if (this.sessionManager) {
-        resources.push({
-          uri: 'obsidian://session-info',
-          name: 'Session Information',
-          description: 'Active MCP sessions and connection pool statistics',
-          mimeType: 'application/json'
-        });
-      }
       
       return { resources };
     });
@@ -257,71 +235,6 @@ export class MCPHttpServer {
             uri,
             mimeType: 'application/json',
             text: JSON.stringify(vaultInfo, null, 2)
-          }]
-        };
-      }
-      
-      if (uri === 'obsidian://session-info' && this.sessionManager) {
-        // Get current session ID from context
-        const currentSessionId = (context as any)?.sessionId;
-        
-        // Get all sessions
-        const sessions = this.sessionManager.getAllSessions();
-        const sessionStats = this.sessionManager.getStats();
-        const poolStats = this.connectionPool?.getStats();
-        
-        // Format session data
-        const sessionData = sessions.map(session => {
-          const idleTime = Date.now() - session.lastActivityAt;
-          const age = Date.now() - session.createdAt;
-          
-          return {
-            sessionId: session.sessionId,
-            isCurrentSession: session.sessionId === currentSessionId,
-            createdAt: new Date(session.createdAt).toISOString(),
-            lastActivityAt: new Date(session.lastActivityAt).toISOString(),
-            requestCount: session.requestCount,
-            ageSeconds: Math.round(age / 1000),
-            idleSeconds: Math.round(idleTime / 1000),
-            status: session.sessionId === currentSessionId ? '🟢 This is you!' : '🔵 Active'
-          };
-        });
-        
-        // Sort sessions - current session first, then by last activity
-        sessionData.sort((a, b) => {
-          if (a.isCurrentSession) return -1;
-          if (b.isCurrentSession) return 1;
-          return b.lastActivityAt.localeCompare(a.lastActivityAt);
-        });
-        
-        const sessionInfo = {
-          summary: {
-            activeSessions: sessionStats.activeSessions,
-            maxSessions: sessionStats.maxSessions,
-            utilization: `${Math.round((sessionStats.activeSessions / sessionStats.maxSessions) * 100)}%`,
-            totalRequests: sessionStats.totalRequests,
-            oldestSessionAge: `${Math.round(sessionStats.oldestSessionAge / 1000)}s`,
-            newestSessionAge: `${Math.round(sessionStats.newestSessionAge / 1000)}s`
-          },
-          connectionPool: poolStats ? {
-            activeConnections: poolStats.activeConnections,
-            queuedRequests: poolStats.queuedRequests,
-            maxConnections: poolStats.maxConnections,
-            poolUtilization: `${Math.round(poolStats.utilization * 100)}%`
-          } : null,
-          sessions: sessionData,
-          settings: {
-            sessionTimeout: '1 hour',
-            maxConcurrentConnections: this.plugin?.settings?.maxConcurrentConnections || 32
-          },
-          timestamp: new Date().toISOString()
-        };
-        
-        return {
-          contents: [{
-            uri,
-            mimeType: 'application/json',
-            text: JSON.stringify(sessionInfo, null, 2)
           }]
         };
       }
@@ -416,56 +329,107 @@ export class MCPHttpServer {
       Debug.log(`📨 MCP Request: ${request.method}${sessionId ? ` [Session: ${sessionId}]` : ''}`, request.params);
       let transport: StreamableHTTPServerTransport;
       let effectiveSessionId = sessionId;
+      let mcpServer: MCPServer;
 
-      if (sessionId && this.transports.has(sessionId)) {
-        // Use existing transport for this session
-        transport = this.transports.get(sessionId)!;
-        
-        // Update session activity if manager is enabled
-        if (this.sessionManager) {
-          this.sessionManager.touchSession(sessionId);
+      // Determine which server to use
+      if (this.mcpServerPool) {
+        // Concurrent mode - use server pool
+        if (sessionId && this.transports.has(sessionId)) {
+          // Use existing transport for this session
+          transport = this.transports.get(sessionId)!;
+          
+          // Get the server for this session (it should already exist)
+          mcpServer = this.mcpServerPool.getOrCreateServer(sessionId);
+          
+          // Update session activity
+          if (this.sessionManager) {
+            this.sessionManager.touchSession(sessionId);
+          }
+        } else if (sessionId && this.sessionManager) {
+          // Session ID provided but transport not found - check if it's a valid reused session
+          const session = this.sessionManager.getOrCreateSession(sessionId);
+          
+          // Get or create server for this session
+          mcpServer = this.mcpServerPool.getOrCreateServer(sessionId);
+          
+          // Create new transport for the reused session
+          effectiveSessionId = sessionId;
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => effectiveSessionId!
+          });
+          
+          await mcpServer.connect(transport);
+          this.transports.set(effectiveSessionId, transport);
+          this.connectionCount++;
+          
+          Debug.log(`♻️ Reused session ${sessionId} (requests: ${session.requestCount})`);
+        } else if (!sessionId && isInitializeRequest(request)) {
+          // New initialization request - create new transport with session
+          effectiveSessionId = randomUUID();
+          
+          // Get or create server for this session
+          mcpServer = this.mcpServerPool.getOrCreateServer(effectiveSessionId);
+          
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => effectiveSessionId!
+          });
+          
+          // Connect the MCP server to this transport
+          await mcpServer.connect(transport);
+          
+          // Store the transport for future requests
+          this.transports.set(effectiveSessionId, transport);
+          this.connectionCount++;
+          
+          // Register session with manager if enabled
+          if (this.sessionManager) {
+            this.sessionManager.getOrCreateSession(effectiveSessionId);
+          }
+          
+          Debug.log(`🔗 Created new MCP session: ${effectiveSessionId} (Total: ${this.connectionCount})`);
+        } else {
+          // Handle stateless requests or create temporary transport
+          // Use a temporary session ID for stateless requests
+          const tempSessionId = `temp-${randomUUID()}`;
+          mcpServer = this.mcpServerPool.getOrCreateServer(tempSessionId);
+          
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined // Stateless mode
+          });
+          await mcpServer.connect(transport);
         }
-      } else if (sessionId && this.sessionManager) {
-        // Session ID provided but transport not found - check if it's a valid reused session
-        const session = this.sessionManager.getOrCreateSession(sessionId);
-        
-        // Create new transport for the reused session
-        effectiveSessionId = sessionId;
-        transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => effectiveSessionId!
-        });
-        
-        await this.mcpServer.connect(transport);
-        this.transports.set(effectiveSessionId, transport);
-        this.connectionCount++;
-        
-        Debug.log(`♻️ Reused session ${sessionId} (requests: ${session.requestCount})`);
-      } else if (!sessionId && isInitializeRequest(request)) {
-        // New initialization request - create new transport with session
-        effectiveSessionId = randomUUID();
-        transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => effectiveSessionId!
-        });
-        
-        // Connect the MCP server to this transport
-        await this.mcpServer.connect(transport);
-        
-        // Store the transport for future requests
-        this.transports.set(effectiveSessionId, transport);
-        this.connectionCount++;
-        
-        // Register session with manager if enabled
-        if (this.sessionManager) {
-          this.sessionManager.getOrCreateSession(effectiveSessionId);
-        }
-        
-        Debug.log(`🔗 Created new MCP session: ${effectiveSessionId} (Total: ${this.connectionCount}`);
       } else {
-        // Handle stateless requests or create temporary transport
-        transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: undefined // Stateless mode
-        });
-        await this.mcpServer.connect(transport);
+        // Non-concurrent mode - use single server
+        if (!this.mcpServer) {
+          throw new Error('MCP server not initialized');
+        }
+        mcpServer = this.mcpServer;
+        
+        if (sessionId && this.transports.has(sessionId)) {
+          // Use existing transport for this session
+          transport = this.transports.get(sessionId)!;
+        } else if (!sessionId && isInitializeRequest(request)) {
+          // New initialization request - create new transport with session
+          effectiveSessionId = randomUUID();
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => effectiveSessionId!
+          });
+          
+          // Connect the MCP server to this transport
+          await mcpServer.connect(transport);
+          
+          // Store the transport for future requests
+          this.transports.set(effectiveSessionId, transport);
+          this.connectionCount++;
+          
+          Debug.log(`🔗 Created new MCP session: ${effectiveSessionId} (Total: ${this.connectionCount})`);
+        } else {
+          // Handle stateless requests or create temporary transport
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined // Stateless mode
+          });
+          await mcpServer.connect(transport);
+        }
       }
 
       // Set session header if we have one
@@ -542,6 +506,11 @@ export class MCPHttpServer {
       await this.connectionPool.shutdown();
     }
 
+    // Shutdown MCP server pool if it exists
+    if (this.mcpServerPool) {
+      await this.mcpServerPool.shutdown();
+    }
+
     return new Promise<void>((resolve) => {
       this.server?.close(() => {
         this.isRunning = false;
@@ -574,15 +543,34 @@ export class MCPHttpServer {
       maxConnections: number;
       utilization: number;
     };
+    serverPoolStats?: {
+      activeServers: number;
+      maxServers: number;
+      utilization: string;
+      totalRequests: number;
+    };
   } {
     if (!this.connectionPool) {
       return { enabled: false };
     }
 
-    return {
+    const result: any = {
       enabled: true,
       stats: this.connectionPool.getStats()
     };
+
+    // Include MCP server pool stats if available
+    if (this.mcpServerPool) {
+      const poolStats = this.mcpServerPool.getStats();
+      result.serverPoolStats = {
+        activeServers: poolStats.activeServers,
+        maxServers: poolStats.maxServers,
+        utilization: poolStats.utilization,
+        totalRequests: poolStats.totalRequests
+      };
+    }
+
+    return result;
   }
 
   /**
