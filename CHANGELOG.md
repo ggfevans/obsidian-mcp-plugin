@@ -5,6 +5,31 @@ All notable changes to the Obsidian MCP Plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2025-07-05
+
+### Added
+- **True Concurrent Sessions Support**: Multiple AI agents can work simultaneously without blocking
+  - Session-isolated MCP server pool architecture
+  - Each session gets its own complete MCP server instance
+  - Automatic session management with 1-hour timeout
+  - Session reuse for reconnecting clients
+- **Session Monitoring**: New `obsidian://session-info` resource shows active sessions
+- **Enhanced Documentation**: 
+  - mcp-remote configuration for Claude Desktop
+  - Dynamic resource count in plugin settings
+  - Both direct HTTP and mcp-remote options documented
+
+### Fixed
+- Concurrent sessions now truly run in parallel without interference
+- Graph traversal operations no longer block other sessions
+- Session context properly isolated between connections
+- Plugin settings UI shows all available resources
+
+### Changed
+- Moved concurrency isolation to a higher architectural level
+- MCP SDK remains unaware of concurrency (simpler, cleaner design)
+- Transparent request routing to session-specific servers
+
 ## [0.5.8c] - 2025-07-05
 
 ### Added
