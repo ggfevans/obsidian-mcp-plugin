@@ -101,7 +101,18 @@ export default class ObsidianMCPPlugin extends Plugin {
 				const status = await this.checkPortConflict(this.settings.httpPort);
 				if (status === 'in-use') {
 					const suggestedPort = await this.findAvailablePort(this.settings.httpPort);
-					console.log(`⚠️ Port ${this.settings.httpPort} is in use, trying port ${suggestedPort}`);
+					
+					if (suggestedPort === 0) {
+						// All alternate ports are busy
+						const portsChecked = `${this.settings.httpPort}, ${this.settings.httpPort + 1}, ${this.settings.httpPort + 2}, ${this.settings.httpPort + 3}`;
+						console.error(`❌ Failed to find available port after 3 attempts. Ports checked: ${portsChecked}`);
+						console.error('Please check for other applications using these ports or firewall/security software blocking access.');
+						new Notice(`Cannot start MCP server: Ports ${this.settings.httpPort}-${this.settings.httpPort + 3} are all in use. Check console for details.`);
+						this.updateStatusBar();
+						return;
+					}
+					
+					console.log(`⚠️ Port ${this.settings.httpPort} is in use, switching to port ${suggestedPort}`);
 					new Notice(`Port ${this.settings.httpPort} is in use. Switching to port ${suggestedPort}`);
 					
 					// Temporarily use the suggested port for this session
@@ -196,13 +207,17 @@ export default class ObsidianMCPPlugin extends Plugin {
 	}
 
 	private async findAvailablePort(startPort: number): Promise<number> {
-		for (let port = startPort + 1; port <= startPort + 100; port++) {
+		const maxRetries = 3;
+		for (let i = 1; i <= maxRetries; i++) {
+			const port = startPort + i;
 			const status = await this.checkPortConflict(port);
 			if (status === 'available') {
 				return port;
 			}
+			console.log(`Port ${port} is also in use, trying next...`);
 		}
-		return startPort + 1; // Fallback
+		// If all 3 alternate ports are busy, return 0 to indicate failure
+		return 0;
 	}
 
 	getMCPServerInfo(): any {
