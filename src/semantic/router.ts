@@ -467,7 +467,9 @@ export class SemanticRouter {
           operation: params.operation,
           targetType: params.targetType,
           target: params.target,
-          content: params.content
+          content: params.content,
+          old_text: params.oldText,
+          new_text: params.newText
         });
       case 'at_line': {
         // Get content to insert
