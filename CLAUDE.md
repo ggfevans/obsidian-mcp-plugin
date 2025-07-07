@@ -165,6 +165,32 @@ src/
 }
 ```
 
+### Pre-Push Quality Checks
+
+**ALWAYS run these commands before pushing to GitHub:**
+
+```bash
+# 1. Build the project to catch TypeScript errors
+npm run build
+
+# 2. Run linting to ensure code quality
+npm run lint
+
+# 3. Run tests to catch regressions
+npm test
+
+# 4. If all pass, commit and push
+git add -A && git commit -m "..."
+git push origin main
+```
+
+**Quick one-liner for all checks:**
+```bash
+npm run build && npm run lint && npm test && echo "✅ All checks passed!"
+```
+
+Note: Even for "simple" changes like updating descriptions or documentation, running these checks ensures no accidental syntax errors or regressions are introduced.
+
 ## Plugin-Specific Guidelines
 
 ### Obsidian Plugin Lifecycle
