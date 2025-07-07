@@ -265,8 +265,12 @@ export class ObsidianAPI {
 
     let content = await this.app.vault.read(file);
     
-    // Handle different patch operations
-    if (params.operation === 'replace') {
+    // Handle structured targeting (heading, block, frontmatter)
+    if (params.targetType && params.target) {
+      content = await this.applyStructuredPatch(content, params);
+    } 
+    // Handle legacy patch operations
+    else if (params.operation === 'replace') {
       if (params.old_text && params.new_text) {
         content = content.replace(params.old_text, params.new_text);
       }
@@ -282,6 +286,187 @@ export class ObsidianAPI {
 
     await this.app.vault.modify(file, content);
     return { success: true, updated_content: content };
+  }
+
+  private async applyStructuredPatch(content: string, params: any): Promise<string> {
+    const { targetType, target, operation, content: patchContent } = params;
+    
+    switch (targetType) {
+      case 'heading':
+        return this.patchHeading(content, target, operation, patchContent);
+      case 'block':
+        return this.patchBlock(content, target, operation, patchContent);
+      case 'frontmatter':
+        return this.patchFrontmatter(content, target, operation, patchContent);
+      default:
+        throw new Error(`Unknown targetType: ${targetType}`);
+    }
+  }
+
+  private patchHeading(content: string, headingPath: string, operation: string, patchContent: string): string {
+    const lines = content.split('\n');
+    const headingHierarchy = headingPath.split('::').map(h => h.trim());
+    
+    // Find the target heading
+    let currentLevel = 0;
+    let targetLineIndex = -1;
+    let endLineIndex = -1;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+      
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const headingText = headingMatch[2].trim();
+        
+        // Check if we're at the right level in hierarchy
+        if (currentLevel < headingHierarchy.length && 
+            headingText === headingHierarchy[currentLevel]) {
+          currentLevel++;
+          
+          if (currentLevel === headingHierarchy.length) {
+            targetLineIndex = i;
+            // Find where this section ends
+            for (let j = i + 1; j < lines.length; j++) {
+              const nextHeadingMatch = lines[j].match(/^(#{1,6})\s+/);
+              if (nextHeadingMatch && nextHeadingMatch[1].length <= level) {
+                endLineIndex = j;
+                break;
+              }
+            }
+            if (endLineIndex === -1) {
+              endLineIndex = lines.length;
+            }
+            break;
+          }
+        } else if (level <= currentLevel) {
+          // Reset if we've moved to a different section
+          currentLevel = 0;
+        }
+      }
+    }
+    
+    if (targetLineIndex === -1) {
+      throw new Error(`Heading not found: ${headingPath}`);
+    }
+    
+    // Apply the operation
+    switch (operation) {
+      case 'append':
+        // Add content at the end of the section
+        lines.splice(endLineIndex, 0, '', patchContent);
+        break;
+      case 'prepend':
+        // Add content right after the heading
+        lines.splice(targetLineIndex + 1, 0, '', patchContent);
+        break;
+      case 'replace': {
+        // Replace the entire section content (keeping the heading)
+        const sectionLines = endLineIndex - targetLineIndex - 1;
+        lines.splice(targetLineIndex + 1, sectionLines, '', patchContent);
+        break;
+      }
+    }
+    
+    return lines.join('\n');
+  }
+
+  private patchBlock(content: string, blockId: string, operation: string, patchContent: string): string {
+    const lines = content.split('\n');
+    let blockLineIndex = -1;
+    
+    // Find the block by ID (blocks end with ^blockId)
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim().endsWith(`^${blockId}`)) {
+        blockLineIndex = i;
+        break;
+      }
+    }
+    
+    if (blockLineIndex === -1) {
+      throw new Error(`Block not found: ^${blockId}`);
+    }
+    
+    // Apply the operation
+    switch (operation) {
+      case 'append':
+        lines[blockLineIndex] = lines[blockLineIndex].replace(`^${blockId}`, `${patchContent} ^${blockId}`);
+        break;
+      case 'prepend': {
+        const blockContent = lines[blockLineIndex].replace(`^${blockId}`, '').trim();
+        lines[blockLineIndex] = `${patchContent} ${blockContent} ^${blockId}`;
+        break;
+      }
+      case 'replace':
+        lines[blockLineIndex] = `${patchContent} ^${blockId}`;
+        break;
+    }
+    
+    return lines.join('\n');
+  }
+
+  private patchFrontmatter(content: string, field: string, operation: string, patchContent: string): string {
+    const lines = content.split('\n');
+    let inFrontmatter = false;
+    let frontmatterStart = -1;
+    let frontmatterEnd = -1;
+    
+    // Find frontmatter boundaries
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === '---') {
+        if (!inFrontmatter) {
+          inFrontmatter = true;
+          frontmatterStart = i;
+        } else {
+          frontmatterEnd = i;
+          break;
+        }
+      }
+    }
+    
+    // If no frontmatter exists, create it
+    if (frontmatterStart === -1) {
+      lines.unshift('---', `${field}: ${patchContent}`, '---', '');
+      return lines.join('\n');
+    }
+    
+    // Find the field in frontmatter
+    let fieldLineIndex = -1;
+    for (let i = frontmatterStart + 1; i < frontmatterEnd; i++) {
+      if (lines[i].startsWith(`${field}:`)) {
+        fieldLineIndex = i;
+        break;
+      }
+    }
+    
+    switch (operation) {
+      case 'append':
+        if (fieldLineIndex !== -1) {
+          const currentValue = lines[fieldLineIndex].substring(field.length + 1).trim();
+          lines[fieldLineIndex] = `${field}: ${currentValue} ${patchContent}`;
+        } else {
+          lines.splice(frontmatterEnd, 0, `${field}: ${patchContent}`);
+        }
+        break;
+      case 'prepend':
+        if (fieldLineIndex !== -1) {
+          const currentValue = lines[fieldLineIndex].substring(field.length + 1).trim();
+          lines[fieldLineIndex] = `${field}: ${patchContent} ${currentValue}`;
+        } else {
+          lines.splice(frontmatterEnd, 0, `${field}: ${patchContent}`);
+        }
+        break;
+      case 'replace':
+        if (fieldLineIndex !== -1) {
+          lines[fieldLineIndex] = `${field}: ${patchContent}`;
+        } else {
+          lines.splice(frontmatterEnd, 0, `${field}: ${patchContent}`);
+        }
+        break;
+    }
+    
+    return lines.join('\n');
   }
 
   /**
