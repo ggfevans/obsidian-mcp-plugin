@@ -5,6 +5,55 @@ All notable changes to the Obsidian MCP Plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.12] - 2025-07-07
+
+### Changed
+- **Enhanced Tool Descriptions**: Improved clarity for AI agents
+  - Added single emoji per operation for visual categorization (📁✏️👁️💡ℹ️🕸️)
+  - Clarified action descriptions with specific use cases
+  - Refined parameter descriptions to avoid ambiguity
+  - Better disambiguation between similar actions (e.g., window vs file)
+  - Balanced approach: ~17% character increase for significant clarity gains
+
+### Design Philosophy
+- Single emoji per operation category to aid visual scanning
+- No emojis in parameters to avoid style contamination in user content
+- Trust the semantic hinting layer for workflow guidance
+- Focus on what makes each action unique
+
+## [0.5.11] - 2025-07-07
+
+### Added
+- **Structured Patch Targeting**: Precise document modifications
+  - Target headings with `targetType: 'heading'` and nested paths like "Section::Subsection"
+  - Target blocks with `targetType: 'block'` using block IDs (^blockId)
+  - Target frontmatter with `targetType: 'frontmatter'` for field updates
+  - All modes support append, prepend, and replace operations
+
+### Technical Implementation
+- New helper methods: `patchHeading()`, `patchBlock()`, `patchFrontmatter()`
+- Intelligent section boundary detection for heading operations
+- Automatic frontmatter creation if none exists
+- Maintains exact whitespace and formatting of untargeted content
+- 7 comprehensive unit tests covering all patch modes
+
+### Fixed
+- Patch operations now properly handle structured targeting as originally designed
+- Resolved disconnect between semantic API design and implementation
+
+## [0.5.10] - 2025-07-07
+
+### Fixed
+- **Patch Operation Silent Failures**: Resolved parameter mismatch issue
+  - Patch operations were returning success without modifying files
+  - Fixed parameter passing between semantic router and API layer
+  - The router now correctly maps `oldText`/`newText` to `old_text`/`new_text`
+  - Resolves issue #4 where patch operations failed silently
+
+### Changed
+- Updated semantic router to properly pass patch parameters
+- Maintained backward compatibility with existing patch operations
+
 ## [0.5.9] - 2025-07-05
 
 ### Added
