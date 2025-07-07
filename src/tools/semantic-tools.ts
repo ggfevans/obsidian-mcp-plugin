@@ -141,12 +141,12 @@ function filterImageFilesFromSearchResults(searchResult: any): any {
 
 function getOperationDescription(operation: string): string {
   const descriptions: Record<string, string> = {
-    vault: 'File and folder operations - list, read, create, update, delete, search, fragments. Search supports operators: file: (search by filename or extension, e.g. file:.png), path: (search in file path), content: (search in file content), tag: (search for tags). OR operator for multiple terms (e.g. agile OR scrum). Quoted phrases for exact matches (e.g. "user story"). Regex patterns with /pattern/flags syntax (e.g. /\\.png$/i). Operators can be combined: "user story" OR "acceptance criteria". Without operators, searches both filename and content. Results are ranked by relevance.',
-    edit: 'Smart editing operations - window (auto-buffers content), append, patch, at_line, from_buffer',
-    view: 'Content viewing and navigation - file, window, active, open_in_obsidian',
-    workflow: 'Workflow guidance and suggestions based on current context',
-    system: 'System operations - info, commands, fetch_web',
-    graph: 'Graph traversal and link analysis - traverse (explore connected nodes), neighbors (get immediate connections), path (find paths between nodes), statistics (get link counts), backlinks (incoming links), forwardlinks (outgoing links), search-traverse (search-based graph traversal returning snippet chains), advanced-traverse (multi-query search traversal with strategies), tag-traverse (follow tag connections as graph edges), tag-analysis (analyze tag-based connectivity), shared-tags (find common tags between files)'
+    vault: '📁 File operations - list, read, create, update, delete, search, fragments (extract snippets from large files). Search supports operators: file:, path:, content:, tag:. OR for multiple terms. "quoted phrases". /regex/. Results ranked by relevance.',
+    edit: '✏️ Edit files - window: find/replace with fuzzy matching, append: add to end, patch: modify headings/blocks/frontmatter, at_line: insert at line number, from_buffer: reuse previous window content',
+    view: '👁️ View content - file: entire document, window: ~20 lines around point, active: current editor file, open_in_obsidian: launch in app',
+    workflow: '💡 Get contextual suggestions for next actions based on current state',
+    system: 'ℹ️ System operations - info: server details, commands: available actions, fetch_web: retrieve and process web content',
+    graph: '🕸️ Graph navigation - traverse: explore connections, neighbors: immediate links, path: find routes between notes, statistics: link counts, backlinks/forwardlinks: directional analysis, search-traverse: connected snippets'
   };
   return descriptions[operation] || 'Unknown operation';
 }
@@ -168,14 +168,14 @@ function getParametersForOperation(operation: string): Record<string, any> {
   const pathParam = {
     path: {
       type: 'string',
-      description: 'Path to the file or directory'
+      description: 'File path relative to vault root'
     }
   };
   
   const contentParam = {
     content: {
       type: 'string',
-      description: 'Content to write or append'
+      description: 'Text content to write (markdown supported)'
     }
   };
   
@@ -251,11 +251,11 @@ function getParametersForOperation(operation: string): Record<string, any> {
       targetType: {
         type: 'string',
         enum: ['heading', 'block', 'frontmatter'],
-        description: 'What to target: heading (by path like "H1::H2"), block (by ID), or frontmatter (field)'
+        description: 'Structure to target: heading (use :: for nesting), block (by ID), or frontmatter (field name)'
       },
       target: {
         type: 'string',
-        description: 'Target identifier - e.g., "Daily Notes::Today" for heading, block ID, or frontmatter field name'
+        description: 'Target identifier (e.g., "Section::Subsection", "blockId", "status")'
       }
     },
     view: {
