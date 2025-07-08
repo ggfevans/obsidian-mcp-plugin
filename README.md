@@ -6,6 +6,8 @@ A high-performance Model Context Protocol (MCP) server implemented as an Obsidia
 
 This plugin brings MCP capabilities directly into Obsidian, eliminating the need for external servers or the REST API plugin. It provides semantic, AI-optimized operations that consolidate multiple tools into intelligent workflows with contextual hints.
 
+![Obsidian MCP Plugin Settings](docs/Plugin_UI_July_2025.png)
+
 ### Key Features
 
 - **Direct Obsidian Integration**: Runs natively within Obsidian for maximum performance
