@@ -1,5 +1,7 @@
 # Obsidian MCP Plugin
 
+> **📋 Community Plugin Status**: This plugin is currently under review for inclusion in the Obsidian Community Plugins directory. Submitted on July 10, 2025 - [PR #6991](https://github.com/obsidianmd/obsidian-releases/pull/6991)
+
 A high-performance Model Context Protocol (MCP) server implemented as an Obsidian plugin, providing AI tools with direct vault access through HTTP transport.
 
 ## Overview
