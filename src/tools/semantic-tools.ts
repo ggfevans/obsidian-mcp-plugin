@@ -141,7 +141,7 @@ function filterImageFilesFromSearchResults(searchResult: any): any {
 
 function getOperationDescription(operation: string): string {
   const descriptions: Record<string, string> = {
-    vault: '📁 File operations - list, read, create, update, delete, search, fragments, move, rename, copy. Search supports operators: file:, path:, content:, tag:. OR for multiple terms. "quoted phrases". /regex/. Results ranked by relevance.',
+    vault: '📁 File operations - list, read, create, update, delete, search, fragments, move, rename, copy, split, combine, concatenate. Search supports operators: file:, path:, content:, tag:. OR for multiple terms. "quoted phrases". /regex/. Results ranked by relevance.',
     edit: '✏️ Edit files - window: find/replace with fuzzy matching, append: add to end, patch: modify headings/blocks/frontmatter, at_line: insert at line number, from_buffer: reuse previous window content',
     view: '👁️ View content - file: entire document, window: ~20 lines around point, active: current editor file, open_in_obsidian: launch in app',
     workflow: '💡 Get contextual suggestions for next actions based on current state',
@@ -153,7 +153,7 @@ function getOperationDescription(operation: string): string {
 
 function getActionsForOperation(operation: string): string[] {
   const actions: Record<string, string[]> = {
-    vault: ['list', 'read', 'create', 'update', 'delete', 'search', 'fragments', 'move', 'rename', 'copy'],
+    vault: ['list', 'read', 'create', 'update', 'delete', 'search', 'fragments', 'move', 'rename', 'copy', 'split', 'combine', 'concatenate'],
     edit: ['window', 'append', 'patch', 'at_line', 'from_buffer'],
     view: ['file', 'window', 'active', 'open_in_obsidian'],
     workflow: ['suggest'],
@@ -227,6 +227,74 @@ function getParametersForOperation(operation: string): Record<string, any> {
       overwrite: {
         type: 'boolean',
         description: 'Whether to overwrite if destination exists (default: false)'
+      },
+      // Split operation parameters
+      splitBy: {
+        type: 'string',
+        enum: ['heading', 'delimiter', 'lines', 'size'],
+        description: 'Split strategy: heading (by markdown headings), delimiter (by custom string), lines (by line count), size (by character count)'
+      },
+      delimiter: {
+        type: 'string',
+        description: 'Delimiter string/regex for delimiter strategy (default: "---")'
+      },
+      level: {
+        type: 'number',
+        description: 'Heading level for heading strategy (1-6)'
+      },
+      linesPerFile: {
+        type: 'number',
+        description: 'Number of lines per file for lines strategy (default: 100)'
+      },
+      maxSize: {
+        type: 'number',
+        description: 'Max characters per file for size strategy (default: 10000)'
+      },
+      outputPattern: {
+        type: 'string',
+        description: 'Naming pattern for output files (default: "{filename}-{index}{ext}")'
+      },
+      outputDirectory: {
+        type: 'string',
+        description: 'Directory for output files (defaults to source directory)'
+      },
+      // Combine operation parameters
+      paths: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Array of file paths to combine'
+      },
+      separator: {
+        type: 'string',
+        description: 'Content separator between files (default: "\\n\\n---\\n\\n")'
+      },
+      includeFilenames: {
+        type: 'boolean',
+        description: 'Include source filenames as headers (default: false)'
+      },
+      sortBy: {
+        type: 'string',
+        enum: ['name', 'modified', 'created', 'size'],
+        description: 'Sort files before combining'
+      },
+      sortOrder: {
+        type: 'string',
+        enum: ['asc', 'desc'],
+        description: 'Sort order (default: "asc")'
+      },
+      // Concatenate operation parameters
+      path1: {
+        type: 'string',
+        description: 'First file path for concatenation'
+      },
+      path2: {
+        type: 'string',
+        description: 'Second file path for concatenation'
+      },
+      mode: {
+        type: 'string',
+        enum: ['append', 'prepend', 'new'],
+        description: 'Concatenation mode: append to path1, prepend to path1, or create new file'
       },
       ...contentParam
     },

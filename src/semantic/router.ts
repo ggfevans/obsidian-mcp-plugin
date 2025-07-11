@@ -423,6 +423,182 @@ export class SemanticRouter {
         };
       }
       
+      case 'split': {
+        const { path, splitBy, delimiter, level, linesPerFile, maxSize, outputPattern, outputDirectory } = params;
+        
+        if (!path || !splitBy) {
+          throw new Error('Both path and splitBy are required for split operation');
+        }
+        
+        // Get the source file
+        const sourceFile = await this.api.getFile(path);
+        if (!sourceFile) {
+          throw new Error(`File not found: ${path}`);
+        }
+        
+        if (isImageFile(sourceFile)) {
+          throw new Error('Cannot split image files');
+        }
+        
+        // Split the content
+        const splitFiles = await this.splitContent(sourceFile.content, params);
+        
+        // Create output files
+        const createdFiles = [];
+        const pathParts = path.split('/');
+        const filename = pathParts.pop() || '';
+        const dir = outputDirectory || pathParts.join('/');
+        const [basename, ext] = filename.includes('.') 
+          ? [filename.substring(0, filename.lastIndexOf('.')), filename.substring(filename.lastIndexOf('.'))]
+          : [filename, ''];
+        
+        for (let i = 0; i < splitFiles.length; i++) {
+          const pattern = outputPattern || '{filename}-{index}{ext}';
+          const outputFilename = pattern
+            .replace('{filename}', basename)
+            .replace('{index}', String(i + 1).padStart(3, '0'))
+            .replace('{ext}', ext);
+          
+          const outputPath = dir ? `${dir}/${outputFilename}` : outputFilename;
+          await this.api.createFile(outputPath, splitFiles[i].content);
+          
+          createdFiles.push({
+            path: outputPath,
+            lines: splitFiles[i].content.split('\n').length,
+            size: splitFiles[i].content.length
+          });
+        }
+        
+        return {
+          success: true,
+          sourceFile: path,
+          createdFiles,
+          totalFiles: createdFiles.length,
+          workflow: {
+            message: `Successfully split ${path} into ${createdFiles.length} files`,
+            suggested_next: [
+              {
+                description: 'View one of the split files',
+                command: `view(action='file', path='${createdFiles[0]?.path}')`
+              },
+              {
+                description: 'List all created files',
+                command: `vault(action='list', directory='${dir || '.'}')`
+              },
+              {
+                description: 'Combine files back together',
+                command: `vault(action='combine', paths=${JSON.stringify(createdFiles.map(f => f.path))}, destination='${path}-combined${ext}')`
+              }
+            ]
+          }
+        };
+      }
+      
+      case 'combine': {
+        const { paths, destination, separator = '\n\n---\n\n', includeFilenames = false, overwrite = false, sortBy, sortOrder = 'asc' } = params;
+        
+        if (!paths || !Array.isArray(paths) || paths.length === 0) {
+          throw new Error('paths array is required for combine operation');
+        }
+        
+        if (!destination) {
+          throw new Error('destination is required for combine operation');
+        }
+        
+        // Check if destination exists
+        try {
+          const destFile = await this.api.getFile(destination);
+          if (destFile && !overwrite) {
+            throw new Error(`Destination already exists: ${destination}. Set overwrite=true to replace.`);
+          }
+        } catch (e) {
+          // File doesn't exist, which is what we want
+        }
+        
+        // Validate and get all source files
+        const sourceFiles = [];
+        for (const path of paths) {
+          const file = await this.api.getFile(path);
+          if (!file) {
+            throw new Error(`File not found: ${path}`);
+          }
+          if (isImageFile(file)) {
+            throw new Error(`Cannot combine image files: ${path}`);
+          }
+          sourceFiles.push({ path, content: file.content });
+        }
+        
+        // Sort files if requested
+        if (sortBy) {
+          await this.sortFiles(sourceFiles, sortBy, sortOrder);
+        }
+        
+        // Combine content
+        const combinedContent = [];
+        for (const file of sourceFiles) {
+          if (includeFilenames) {
+            const filename = file.path.split('/').pop() || file.path;
+            combinedContent.push(`# ${filename}`);
+            combinedContent.push('');
+          }
+          combinedContent.push(file.content);
+        }
+        
+        const finalContent = combinedContent.join(separator);
+        
+        // Create or update destination file
+        if (overwrite) {
+          await this.api.updateFile(destination, finalContent);
+        } else {
+          await this.api.createFile(destination, finalContent);
+        }
+        
+        return {
+          success: true,
+          destination,
+          filesCombined: paths.length,
+          totalSize: finalContent.length,
+          workflow: {
+            message: `Successfully combined ${paths.length} files into ${destination}`,
+            suggested_next: [
+              {
+                description: 'View the combined file',
+                command: `view(action='file', path='${destination}')`
+              },
+              {
+                description: 'Edit the combined file',
+                command: `edit(action='window', path='${destination}', oldText='...', newText='...')`
+              },
+              {
+                description: 'Split the file back into parts',
+                command: `vault(action='split', path='${destination}', splitBy='delimiter', delimiter='${separator}')`
+              }
+            ]
+          }
+        };
+      }
+      
+      case 'concatenate': {
+        const { path1, path2, destination, mode = 'append' } = params;
+        
+        if (!path1 || !path2) {
+          throw new Error('Both path1 and path2 are required for concatenate operation');
+        }
+        
+        // Determine paths and destination based on mode
+        const paths = mode === 'prepend' ? [path2, path1] : [path1, path2];
+        const dest = destination || (mode === 'new' ? `${path1}-concatenated` : path1);
+        
+        // Use combine operation internally
+        return this.executeVaultOperation('combine', {
+          paths,
+          destination: dest,
+          separator: '\n\n',
+          overwrite: mode !== 'new',
+          includeFilenames: false
+        });
+      }
+      
       default:
         throw new Error(`Unknown vault action: ${action}`);
     }
@@ -464,6 +640,163 @@ export class SemanticRouter {
       }
       
       return 0;
+    });
+  }
+  
+  private async splitContent(content: string, params: any): Promise<Array<{ content: string }>> {
+    const { splitBy, delimiter, level, linesPerFile, maxSize } = params;
+    const splitFiles: Array<{ content: string }> = [];
+    
+    switch (splitBy) {
+      case 'heading': {
+        // Split by markdown headings
+        const headingLevel = level || 1;
+        const headingRegex = new RegExp(`^${'#'.repeat(headingLevel)}\\s+.+$`, 'gm');
+        const matches = Array.from(content.matchAll(headingRegex));
+        
+        if (matches.length === 0) {
+          // No headings found, return original content
+          return [{ content }];
+        }
+        
+        // Split content at each heading
+        for (let i = 0; i < matches.length; i++) {
+          const match = matches[i];
+          const nextMatch = matches[i + 1];
+          const startIndex = match.index || 0;
+          const endIndex = nextMatch ? nextMatch.index : content.length;
+          
+          if (i === 0 && startIndex > 0) {
+            // Content before first heading
+            splitFiles.push({ content: content.substring(0, startIndex).trim() });
+          }
+          
+          const section = content.substring(startIndex, endIndex).trim();
+          if (section) {
+            splitFiles.push({ content: section });
+          }
+        }
+        break;
+      }
+      
+      case 'delimiter': {
+        // Split by custom delimiter
+        const delim = delimiter || '---';
+        const parts = content.split(delim);
+        
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (trimmed) {
+            splitFiles.push({ content: trimmed });
+          }
+        }
+        break;
+      }
+      
+      case 'lines': {
+        // Split by line count
+        const lines = content.split('\n');
+        const chunkSize = linesPerFile || 100;
+        
+        for (let i = 0; i < lines.length; i += chunkSize) {
+          const chunk = lines.slice(i, i + chunkSize).join('\n');
+          if (chunk.trim()) {
+            splitFiles.push({ content: chunk });
+          }
+        }
+        break;
+      }
+      
+      case 'size': {
+        // Split by character count, preserving word boundaries
+        const max = maxSize || 10000;
+        let currentPos = 0;
+        
+        while (currentPos < content.length) {
+          let endPos = Math.min(currentPos + max, content.length);
+          
+          // If we're not at the end, try to find a good break point
+          if (endPos < content.length) {
+            // Look for paragraph break first
+            const paragraphBreak = content.lastIndexOf('\n\n', endPos);
+            if (paragraphBreak > currentPos && paragraphBreak > endPos - 1000) {
+              endPos = paragraphBreak;
+            } else {
+              // Look for line break
+              const lineBreak = content.lastIndexOf('\n', endPos);
+              if (lineBreak > currentPos && lineBreak > endPos - 200) {
+                endPos = lineBreak;
+              } else {
+                // Look for sentence end
+                const sentenceEnd = content.lastIndexOf('. ', endPos);
+                if (sentenceEnd > currentPos && sentenceEnd > endPos - 100) {
+                  endPos = sentenceEnd + 1;
+                } else {
+                  // Look for word boundary
+                  const wordBoundary = content.lastIndexOf(' ', endPos);
+                  if (wordBoundary > currentPos) {
+                    endPos = wordBoundary;
+                  }
+                }
+              }
+            }
+          }
+          
+          const chunk = content.substring(currentPos, endPos).trim();
+          if (chunk) {
+            splitFiles.push({ content: chunk });
+          }
+          currentPos = endPos;
+          
+          // Skip whitespace at the beginning of next chunk
+          while (currentPos < content.length && /\s/.test(content[currentPos])) {
+            currentPos++;
+          }
+        }
+        break;
+      }
+      
+      default:
+        throw new Error(`Unknown split strategy: ${splitBy}`);
+    }
+    
+    return splitFiles.length > 0 ? splitFiles : [{ content }];
+  }
+  
+  private async sortFiles(files: Array<{ path: string; content: string }>, sortBy: string, sortOrder: string): Promise<void> {
+    // For file metadata, we'd need to use Obsidian's API
+    // For now, we'll sort by name and size (which we can calculate)
+    
+    files.sort((a, b) => {
+      let compareValue = 0;
+      
+      switch (sortBy) {
+        case 'name': {
+          const nameA = a.path.split('/').pop() || a.path;
+          const nameB = b.path.split('/').pop() || b.path;
+          compareValue = nameA.localeCompare(nameB);
+          break;
+        }
+          
+        case 'size':
+          compareValue = a.content.length - b.content.length;
+          break;
+          
+        case 'modified':
+        case 'created': {
+          // Would need file stats from Obsidian API
+          // For now, fall back to name sort
+          const fallbackA = a.path.split('/').pop() || a.path;
+          const fallbackB = b.path.split('/').pop() || b.path;
+          compareValue = fallbackA.localeCompare(fallbackB);
+          break;
+        }
+          
+        default:
+          compareValue = 0;
+      }
+      
+      return sortOrder === 'desc' ? -compareValue : compareValue;
     });
   }
   
