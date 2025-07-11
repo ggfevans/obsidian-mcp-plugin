@@ -148,6 +148,9 @@ Enable multiple AI agents to work with your vault simultaneously without blockin
 - **move** - Move files to new locations (preserves links)
 - **rename** - Rename files in place (preserves links)
 - **copy** - Create copies of files
+- **split** - Split files by headings, delimiter, lines, or size
+- **combine** - Merge multiple files with sorting options
+- **concatenate** - Simple two-file joining
 
 **Search Operators**:
 - `file:` - Search by filename or extension (e.g., `file:.png`)

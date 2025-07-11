@@ -5,7 +5,24 @@ All notable changes to the Obsidian MCP Plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.13] - 2025-07-10
+## [0.5.14] - 2025-01-11
+
+### Added
+- **Advanced File Operations**: New vault actions for complex file manipulation
+  - `split` - Split files into multiple parts with 4 strategies:
+    - `heading` - Split by markdown heading levels
+    - `delimiter` - Split by custom delimiter string
+    - `lines` - Split by line count per file
+    - `size` - Split by character count with smart word boundaries
+  - `combine` - Merge multiple files into one with options:
+    - Custom separators between files
+    - Optional filename headers
+    - Sort files before combining (by name/size/date)
+  - `concatenate` - Simple two-file joining (append/prepend/new)
+  - All operations include semantic workflow hints
+  - Smart content preservation in split operations
+
+## [0.5.13] - 2025-01-10
 
 ### Added
 - **File Management Operations**: New vault actions for organizing files
@@ -16,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Uses native Obsidian file manager when available for link preservation
   - Fallback to copy/delete for environments without direct API access
 
-## [0.5.12] - 2025-07-07
+## [0.5.12] - 2025-01-07
 
 ### Changed
 - **Enhanced Tool Descriptions**: Improved clarity for AI agents
