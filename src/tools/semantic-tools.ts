@@ -141,7 +141,7 @@ function filterImageFilesFromSearchResults(searchResult: any): any {
 
 function getOperationDescription(operation: string): string {
   const descriptions: Record<string, string> = {
-    vault: '📁 File operations - list, read, create, update, delete, search, fragments (extract snippets from large files). Search supports operators: file:, path:, content:, tag:. OR for multiple terms. "quoted phrases". /regex/. Results ranked by relevance.',
+    vault: '📁 File operations - list, read, create, update, delete, search, fragments, move, rename, copy. Search supports operators: file:, path:, content:, tag:. OR for multiple terms. "quoted phrases". /regex/. Results ranked by relevance.',
     edit: '✏️ Edit files - window: find/replace with fuzzy matching, append: add to end, patch: modify headings/blocks/frontmatter, at_line: insert at line number, from_buffer: reuse previous window content',
     view: '👁️ View content - file: entire document, window: ~20 lines around point, active: current editor file, open_in_obsidian: launch in app',
     workflow: '💡 Get contextual suggestions for next actions based on current state',
@@ -153,7 +153,7 @@ function getOperationDescription(operation: string): string {
 
 function getActionsForOperation(operation: string): string[] {
   const actions: Record<string, string[]> = {
-    vault: ['list', 'read', 'create', 'update', 'delete', 'search', 'fragments'],
+    vault: ['list', 'read', 'create', 'update', 'delete', 'search', 'fragments', 'move', 'rename', 'copy'],
     edit: ['window', 'append', 'patch', 'at_line', 'from_buffer'],
     view: ['file', 'window', 'active', 'open_in_obsidian'],
     workflow: ['suggest'],
@@ -215,6 +215,18 @@ function getParametersForOperation(operation: string): Record<string, any> {
       includeContent: {
         type: 'boolean',
         description: 'Include file content in search results (slower but more thorough)'
+      },
+      destination: {
+        type: 'string',
+        description: 'Destination path for move/copy operations'
+      },
+      newName: {
+        type: 'string',
+        description: 'New filename for rename operation (without path)'
+      },
+      overwrite: {
+        type: 'boolean',
+        description: 'Whether to overwrite if destination exists (default: false)'
       },
       ...contentParam
     },

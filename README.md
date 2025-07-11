@@ -145,6 +145,9 @@ Enable multiple AI agents to work with your vault simultaneously without blockin
 - **delete** - Delete files and folders
 - **search** - Enhanced search with Obsidian operators
 - **fragments** - Get relevant excerpts from files
+- **move** - Move files to new locations (preserves links)
+- **rename** - Rename files in place (preserves links)
+- **copy** - Create copies of files
 
 **Search Operators**:
 - `file:` - Search by filename or extension (e.g., `file:.png`)

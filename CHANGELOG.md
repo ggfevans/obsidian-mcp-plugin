@@ -5,6 +5,17 @@ All notable changes to the Obsidian MCP Plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] - 2025-07-10
+
+### Added
+- **File Management Operations**: New vault actions for organizing files
+  - `move` - Move files to new locations with automatic link updates
+  - `rename` - Rename files in place with automatic link updates
+  - `copy` - Create copies of files with optional overwrite
+  - All operations include semantic workflow hints for next actions
+  - Uses native Obsidian file manager when available for link preservation
+  - Fallback to copy/delete for environments without direct API access
+
 ## [0.5.12] - 2025-07-07
 
 ### Changed

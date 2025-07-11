@@ -197,6 +197,232 @@ export class SemanticRouter {
           };
         }
       }
+      case 'move': {
+        const { path, destination, overwrite = false } = params;
+        
+        if (!path || !destination) {
+          throw new Error('Both path and destination are required for move operation');
+        }
+        
+        // Check if source file exists
+        const sourceFile = await this.api.getFile(path);
+        if (!sourceFile) {
+          throw new Error(`Source file not found: ${path}`);
+        }
+        
+        // Check if destination already exists
+        try {
+          const destFile = await this.api.getFile(destination);
+          if (destFile && !overwrite) {
+            throw new Error(`Destination already exists: ${destination}. Set overwrite=true to replace.`);
+          }
+        } catch (e) {
+          // File doesn't exist, which is what we want
+        }
+        
+        // Directory creation is handled automatically by createFile
+        
+        // Use Obsidian's rename method (which handles moves)
+        if (this.app) {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          if (file && 'extension' in file) {
+            await this.app.fileManager.renameFile(file, destination);
+            return { 
+              success: true, 
+              oldPath: path,
+              newPath: destination,
+              workflow: {
+                message: `File moved successfully from ${path} to ${destination}`,
+                suggested_next: [
+                  {
+                    description: 'View the moved file',
+                    command: `view(action='file', path='${destination}')`
+                  },
+                  {
+                    description: 'Edit the moved file',
+                    command: `edit(action='window', path='${destination}', oldText='...', newText='...')`
+                  }
+                ]
+              }
+            };
+          }
+        }
+        
+        // Fallback: copy and delete
+        const sourceFileData = await this.api.getFile(path);
+        if (isImageFile(sourceFileData)) {
+          throw new Error('Cannot move image files using fallback method');
+        }
+        const content = sourceFileData.content;
+        await this.api.createFile(destination, content);
+        await this.api.deleteFile(path);
+        
+        return { 
+          success: true, 
+          oldPath: path,
+          newPath: destination,
+          workflow: {
+            message: `File moved successfully from ${path} to ${destination}`,
+            suggested_next: [
+              {
+                description: 'View the moved file',
+                command: `view(action='file', path='${destination}')`
+              },
+              {
+                description: 'Edit the moved file',
+                command: `edit(action='window', path='${destination}', oldText='...', newText='...')`
+              }
+            ]
+          }
+        };
+      }
+      
+      case 'rename': {
+        const { path, newName, overwrite = false } = params;
+        
+        if (!path || !newName) {
+          throw new Error('Both path and newName are required for rename operation');
+        }
+        
+        // Check if source file exists
+        const sourceFile = await this.api.getFile(path);
+        if (!sourceFile) {
+          throw new Error(`File not found: ${path}`);
+        }
+        
+        // Extract directory from current path
+        const lastSlash = path.lastIndexOf('/');
+        const dir = lastSlash >= 0 ? path.substring(0, lastSlash) : '';
+        const newPath = dir ? `${dir}/${newName}` : newName;
+        
+        // Check if destination already exists
+        try {
+          const destFile = await this.api.getFile(newPath);
+          if (destFile && !overwrite) {
+            throw new Error(`File already exists: ${newPath}. Set overwrite=true to replace.`);
+          }
+        } catch (e) {
+          // File doesn't exist, which is what we want
+        }
+        
+        // Use Obsidian's rename method
+        if (this.app) {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          if (file && 'extension' in file) {
+            await this.app.fileManager.renameFile(file, newPath);
+            return { 
+              success: true,
+              oldPath: path,
+              newPath: newPath,
+              workflow: {
+                message: `File renamed successfully from ${path} to ${newPath}`,
+                suggested_next: [
+                  {
+                    description: 'View the renamed file',
+                    command: `view(action='file', path='${newPath}')`
+                  },
+                  {
+                    description: 'Edit the renamed file', 
+                    command: `edit(action='window', path='${newPath}', oldText='...', newText='...')`
+                  }
+                ]
+              }
+            };
+          }
+        }
+        
+        // Fallback: copy and delete
+        const sourceFileData = await this.api.getFile(path);
+        if (isImageFile(sourceFileData)) {
+          throw new Error('Cannot rename image files using fallback method');
+        }
+        const content = sourceFileData.content;
+        await this.api.createFile(newPath, content);
+        await this.api.deleteFile(path);
+        
+        return { 
+          success: true,
+          oldPath: path,
+          newPath: newPath,
+          workflow: {
+            message: `File renamed successfully from ${path} to ${newPath}`,
+            suggested_next: [
+              {
+                description: 'View the renamed file',
+                command: `view(action='file', path='${newPath}')`
+              },
+              {
+                description: 'Edit the renamed file',
+                command: `edit(action='window', path='${newPath}', oldText='...', newText='...')`
+              }
+            ]
+          }
+        };
+      }
+      
+      case 'copy': {
+        const { path, destination, overwrite = false } = params;
+        
+        if (!path || !destination) {
+          throw new Error('Both path and destination are required for copy operation');
+        }
+        
+        // Check if source file exists
+        const sourceFile = await this.api.getFile(path);
+        if (!sourceFile) {
+          throw new Error(`Source file not found: ${path}`);
+        }
+        
+        // Check if destination already exists
+        try {
+          const destFile = await this.api.getFile(destination);
+          if (destFile && !overwrite) {
+            throw new Error(`Destination already exists: ${destination}. Set overwrite=true to replace.`);
+          }
+        } catch (e) {
+          // File doesn't exist, which is what we want
+        }
+        
+        // Read source content
+        const sourceFileData = await this.api.getFile(path);
+        if (isImageFile(sourceFileData)) {
+          throw new Error('Cannot copy image files - use Obsidian file explorer');
+        }
+        const content = sourceFileData.content;
+        
+        // Directory creation is handled automatically by createFile
+        
+        // Create the copy
+        if (overwrite) {
+          await this.api.updateFile(destination, content);
+        } else {
+          await this.api.createFile(destination, content);
+        }
+        
+        return { 
+          success: true,
+          sourcePath: path,
+          copiedTo: destination,
+          workflow: {
+            message: `File copied successfully from ${path} to ${destination}`,
+            suggested_next: [
+              {
+                description: 'View the copied file',
+                command: `view(action='file', path='${destination}')`
+              },
+              {
+                description: 'Edit the copied file',
+                command: `edit(action='window', path='${destination}', oldText='...', newText='...')`
+              },
+              {
+                description: 'Compare original and copy',
+                command: `view(action='file', path='${path}') then view(action='file', path='${destination}')`
+              }
+            ]
+          }
+        };
+      }
+      
       default:
         throw new Error(`Unknown vault action: ${action}`);
     }
