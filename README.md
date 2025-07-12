@@ -36,7 +36,7 @@ Since this plugin is not yet in the Community Plugins directory, you'll need to 
 2. **Add This Plugin**:
    - In Obsidian settings, go to BRAT settings
    - Click "Add Beta Plugin"
-   - Enter: `aaronsb/obsidian-mcp-plugin`
+   - Enter: `https://github.com/aaronsb/obsidian-mcp-plugin`
    - Click "Add Plugin"
 
 3. **Enable the Plugin**:
