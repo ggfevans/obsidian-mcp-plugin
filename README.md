@@ -8,6 +8,12 @@ A high-performance Model Context Protocol (MCP) server implemented as an Obsidia
 
 This plugin brings MCP capabilities directly into Obsidian, eliminating the need for external servers or the REST API plugin. It provides semantic, AI-optimized operations that consolidate multiple tools into intelligent workflows with contextual hints.
 
+### What are "Semantic Tools"?
+
+Unlike basic tools that just return data, semantic tools are **self-guiding**. When an AI agent uses a semantic tool, it doesn't just get the requested information—it also receives smart suggestions about what to do next. This creates a natural workflow where each action leads intelligently to the next, helping AI agents complete complex tasks without getting stuck or needing constant human guidance.
+
+**Example**: When searching for a file, a semantic tool doesn't just return search results. It also suggests: "Found 3 files matching 'meeting notes'. Consider using `view` to read the most recent one, or `graph traverse` to explore related documents."
+
 ![Obsidian MCP Plugin Settings](docs/Plugin_UI_July_2025.png)
 
 ### Key Features
@@ -138,21 +144,21 @@ Enable multiple AI agents to work with your vault simultaneously without blockin
 ## Available Tools
 
 ### 🗂️ `vault` - File and Folder Operations
-- **list** - List files and directories
-- **read** - Read file content with fragments for large files
-- **create** - Create new files and directories
-- **update** - Update existing files
-- **delete** - Delete files and folders
-- **search** - Enhanced search with Obsidian operators
-- **fragments** - Get relevant excerpts from files
-- **move** - Move files to new locations (preserves links)
-- **rename** - Rename files in place (preserves links)
-- **copy** - Create copies of files
-- **split** - Split files by headings, delimiter, lines, or size
-- **combine** - Merge multiple files with sorting options
-- **concatenate** - Simple two-file joining
+- `list` - List files and directories
+- `read` - Read file content with fragments for large files
+- `create` - Create new files and directories
+- `update` - Update existing files
+- `delete` - Delete files and folders
+- `search` - Enhanced search with Obsidian operators
+- `fragments` - Get relevant excerpts from files
+- `move` - Move files to new locations (preserves links)
+- `rename` - Rename files in place (preserves links)
+- `copy` - Create copies of files
+- `split` - Split files by headings, delimiter, lines, or size
+- `combine` - Merge multiple files with sorting options
+- `concatenate` - Simple two-file joining
 
-**Search Operators**:
+**🔍 Search Operators**:
 - `file:` - Search by filename or extension (e.g., `file:.png`)
 - `path:` - Search in file paths
 - `content:` - Search only in file content
@@ -162,42 +168,42 @@ Enable multiple AI agents to work with your vault simultaneously without blockin
 - `/regex/flags` - Regular expression search
 
 ### ✏️ `edit` - Smart Editing Operations  
-- **window** - Edit with automatic content buffering
-- **append** - Append content to files
-- **patch** - Intelligent patching with fuzzy matching
-- **at_line** - Edit at specific line numbers
-- **from_buffer** - Recover content from edit buffers
+- `window` - Edit with automatic content buffering
+- `append` - Append content to files
+- `patch` - Intelligent patching with fuzzy matching
+- `at_line` - Edit at specific line numbers
+- `from_buffer` - Recover content from edit buffers
 
 ### 👁️ `view` - Content Viewing and Navigation
-- **file** - View complete files with metadata
-- **window** - View content windows with context
-- **active** - Get currently active file
-- **open_in_obsidian** - Open files in Obsidian
+- `file` - View complete files with metadata
+- `window` - View content windows with context
+- `active` - Get currently active file
+- `open_in_obsidian` - Open files in Obsidian
 
 ### 🔄 `workflow` - AI Workflow Guidance
-- **suggest** - Get contextual suggestions based on current operations
+- `suggest` - Get contextual suggestions based on current operations
 
 ### 🕸️ `graph` - Graph Traversal and Link Analysis
-- **traverse** - Explore connected nodes from a starting point
-- **neighbors** - Get immediate connections of a file
-- **path** - Find paths between two nodes
-- **statistics** - Get link counts and statistics for files
-- **backlinks** - Find all incoming links to a file
-- **forwardlinks** - Find all outgoing links from a file
-- **search-traverse** - Search-based graph traversal with snippet chains
-- **advanced-traverse** - Multi-query traversal with strategies (breadth-first, best-first, beam-search)
+- `traverse` - Explore connected nodes from a starting point
+- `neighbors` - Get immediate connections of a file
+- `path` - Find paths between two nodes
+- `statistics` - Get link counts and statistics for files
+- `backlinks` - Find all incoming links to a file
+- `forwardlinks` - Find all outgoing links from a file
+- `search-traverse` - Search-based graph traversal with snippet chains
+- `advanced-traverse` - Multi-query traversal with strategies (breadth-first, best-first, beam-search)
 
 **Graph Features**:
-- Follow links, backlinks, and tags during traversal
-- Filter by file patterns, folders, or tags
-- Control traversal depth and maximum nodes
-- Get relevance scores and snippet chains
-- Support for orphaned notes and unresolved links
+- `links/backlinks/tags` - Follow connections during traversal
+- `pattern/folder/tag filters` - Filter by file patterns, folders, or tags
+- `depth/max_nodes` - Control traversal depth and maximum nodes
+- `relevance_scores` - Get relevance scores and snippet chains
+- `orphaned/unresolved` - Support for orphaned notes and unresolved links
 
 ### ⚙️ `system` - System Operations
-- **info** - Get vault and plugin information
-- **commands** - List and execute Obsidian commands
-- **fetch_web** - Fetch and convert web content to markdown
+- `info` - Get vault and plugin information
+- `commands` - List and execute Obsidian commands
+- `fetch_web` - Fetch and convert web content to markdown
 
 ## Configuration
 
