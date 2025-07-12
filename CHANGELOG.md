@@ -5,6 +5,24 @@ All notable changes to the Obsidian MCP Plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- 🔴 CRITICAL: Identified authentication vulnerability - no API key validation ([#9](https://github.com/aaronsb/obsidian-mcp-plugin/issues/9))
+- 🔴 CRITICAL: Identified path traversal vulnerability in file operations ([#10](https://github.com/aaronsb/obsidian-mcp-plugin/issues/10))
+- 🟠 HIGH: Identified missing input validation across all operations ([#11](https://github.com/aaronsb/obsidian-mcp-plugin/issues/11))
+- 🟠 HIGH: Identified insecure session management implementation ([#12](https://github.com/aaronsb/obsidian-mcp-plugin/issues/12))
+
+### Added
+- Security policy (SECURITY.md) for vulnerability reporting
+- Contributing guidelines (CONTRIBUTING.md)
+- Issue templates for bug reports and feature requests
+- GitHub labels for security, priority, and technical debt tracking
+- Comprehensive security audit documentation
+
+### Changed
+- Project structure improved with proper open-source documentation
+
 ## [0.5.14] - 2025-01-11
 
 ### Added
