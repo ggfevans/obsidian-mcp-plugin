@@ -54,12 +54,26 @@
     margin-top: 10px;
 }
 
+/* Config example containers */
+.protocol-command-example,
+.desktop-config-example {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+}
+
 /* Code Blocks */
 .mcp-code-block {
     display: block;
     padding: 10px;
     background-color: var(--background-primary);
     margin-top: 5px;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    cursor: text;
 }
 
 .mcp-config-example {
@@ -69,6 +83,12 @@
     margin-top: 5px;
     overflow-x: auto;
     font-size: 12px;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    cursor: text;
+    white-space: pre;
 }
 
 /* Action Buttons Section */
