@@ -742,7 +742,7 @@ class MCPSettingTab extends PluginSettingTab {
 		if (protocolSection) {
 			const codeBlock = protocolSection.querySelector('code');
 			if (codeBlock) {
-				codeBlock.textContent = `claude --mcp http://localhost:${info.port}/mcp`;
+				codeBlock.textContent = `claude mcp add obsidian http://localhost:${info.port}/mcp --transport http`;
 			}
 		}
 		
