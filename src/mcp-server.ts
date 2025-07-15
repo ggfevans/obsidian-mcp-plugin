@@ -255,6 +255,15 @@ export class MCPHttpServer {
     // JSON body parser
     this.app.use(express.json());
     
+    // Request logging for debugging (moved before auth to see all requests)
+    this.app.use((req, res, next) => {
+      Debug.log(`📡 ${req.method} ${req.url}`, {
+        headers: req.headers,
+        body: req.body ? JSON.stringify(req.body).substring(0, 200) : ''
+      });
+      next();
+    });
+    
     // Authentication middleware - check API key
     this.app.use((req, res, next) => {
       // Skip auth for OPTIONS requests (CORS preflight)
@@ -265,12 +274,16 @@ export class MCPHttpServer {
       const apiKey = this.plugin?.settings?.apiKey;
       if (!apiKey) {
         // No API key configured, allow access (backward compatibility)
+        Debug.log('🔓 No API key configured, allowing access');
         return next();
       }
       
       // Check Authorization header for Basic Auth
       const authHeader = req.headers.authorization;
+      Debug.log(`🔐 Auth check - Header present: ${!!authHeader}, API key set: ${!!apiKey}`);
+      
       if (!authHeader || !authHeader.startsWith('Basic ')) {
+        Debug.log('❌ Auth failed: Missing or invalid Authorization header');
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
@@ -280,18 +293,16 @@ export class MCPHttpServer {
       const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
       const [username, password] = credentials.split(':');
       
+      Debug.log(`🔐 Auth check - Username: ${username}, Password matches: ${password === apiKey}`);
+      
       // Username can be anything (we use 'obsidian'), password must match API key
       if (password !== apiKey) {
+        Debug.log('❌ Auth failed: Invalid API key');
         res.status(401).json({ error: 'Invalid API key' });
         return;
       }
       
-      next();
-    });
-
-    // Request logging for debugging
-    this.app.use((req, res, next) => {
-      Debug.log(`📡 ${req.method} ${req.url}`, req.body ? JSON.stringify(req.body).substring(0, 200) : '');
+      Debug.log('✅ Auth successful');
       next();
     });
   }
