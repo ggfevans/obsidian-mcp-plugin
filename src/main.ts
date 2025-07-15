@@ -729,12 +729,11 @@ class MCPSettingTab extends PluginSettingTab {
 		const codeEl = commandExample.createEl('code');
 		codeEl.classList.add('mcp-code-block');
 		
-		if (this.plugin.settings.dangerouslyDisableAuth) {
-			codeEl.textContent = `claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp`;
-		} else {
-			const apiKey = this.plugin.settings.apiKey;
-			codeEl.textContent = `claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --header "Authorization: Bearer ${apiKey}"`;
-		}
+		const claudeCommand = this.plugin.settings.dangerouslyDisableAuth ? 
+			`claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp` :
+			`claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --header "Authorization: Bearer ${this.plugin.settings.apiKey}"`;
+		
+		codeEl.textContent = claudeCommand;
 		
 		info.createEl('h4', {text: 'Client Configuration (Claude Desktop, Cline, etc.)'});
 		const desktopDesc = info.createEl('p', {
