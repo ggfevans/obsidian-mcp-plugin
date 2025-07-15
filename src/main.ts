@@ -13,6 +13,7 @@ interface MCPPluginSettings {
 	enableConcurrentSessions: boolean;
 	maxConcurrentConnections: number;
 	apiKey: string;
+	dangerouslyDisableAuth: boolean;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -23,7 +24,8 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	autoDetectPortConflicts: true,
 	enableConcurrentSessions: false, // Disabled by default for backward compatibility
 	maxConcurrentConnections: 32,
-	apiKey: '' // Will be generated on first load
+	apiKey: '', // Will be generated on first load
+	dangerouslyDisableAuth: false // Auth enabled by default
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
@@ -601,6 +603,27 @@ class MCPSettingTab extends PluginSettingTab {
 		});
 		authNote.style.marginTop = '-10px';
 		authNote.style.marginBottom = '20px';
+		
+		// Add dangerous disable auth toggle
+		new Setting(containerEl)
+			.setName('Disable Authentication')
+			.setDesc('⚠️ DANGEROUS: Disable authentication entirely. Only use for testing or if you fully trust your local environment.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.dangerouslyDisableAuth)
+				.onChange(async (value) => {
+					this.plugin.settings.dangerouslyDisableAuth = value;
+					await this.plugin.saveSettings();
+					
+					// Show warning if disabling auth
+					if (value) {
+						new Notice('⚠️ Authentication disabled! Your vault is accessible without credentials.');
+					} else {
+						new Notice('✅ Authentication enabled. API key required for access.');
+					}
+					
+					// Refresh display to update examples
+					this.display();
+				}));
 	}
 
 	private createUIOptionsSection(containerEl: HTMLElement): void {
@@ -664,6 +687,20 @@ class MCPSettingTab extends PluginSettingTab {
 		
 		const info = containerEl.createDiv('mcp-protocol-info');
 		
+		// Show warning if auth is disabled
+		if (this.plugin.settings.dangerouslyDisableAuth) {
+			const warningEl = info.createEl('div', {
+				text: '⚠️ WARNING: Authentication is disabled. Your vault is accessible without credentials!',
+				cls: 'mcp-auth-warning'
+			});
+			warningEl.style.backgroundColor = 'var(--background-modifier-error)';
+			warningEl.style.color = 'var(--text-error)';
+			warningEl.style.padding = '10px';
+			warningEl.style.borderRadius = '5px';
+			warningEl.style.marginBottom = '15px';
+			warningEl.style.fontWeight = 'bold';
+		}
+		
 		const toolsList = [
 			'🗂️ vault - File and folder operations with fragment support',
 			'✏️ edit - Smart editing with content buffers', 
@@ -691,8 +728,13 @@ class MCPSettingTab extends PluginSettingTab {
 		const commandExample = info.createDiv('protocol-command-example');
 		const codeEl = commandExample.createEl('code');
 		codeEl.classList.add('mcp-code-block');
-		const apiKey = this.plugin.settings.apiKey;
-		codeEl.textContent = `claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --header "Authorization: Bearer ${apiKey}"`;
+		
+		if (this.plugin.settings.dangerouslyDisableAuth) {
+			codeEl.textContent = `claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp`;
+		} else {
+			const apiKey = this.plugin.settings.apiKey;
+			codeEl.textContent = `claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --header "Authorization: Bearer ${apiKey}"`;
+		}
 		
 		info.createEl('h4', {text: 'Client Configuration (Claude Desktop, Cline, etc.)'});
 		const desktopDesc = info.createEl('p', {
@@ -705,7 +747,16 @@ class MCPSettingTab extends PluginSettingTab {
 		const configEl = configExample.createEl('pre');
 		configEl.classList.add('mcp-config-example');
 		
-		const configJson = {
+		const configJson = this.plugin.settings.dangerouslyDisableAuth ? {
+			"mcpServers": {
+				"obsidian": {
+					"transport": {
+						"type": "http",
+						"url": `http://localhost:${this.plugin.settings.httpPort}/mcp`
+					}
+				}
+			}
+		} : {
 			"mcpServers": {
 				"obsidian": {
 					"transport": {
@@ -719,9 +770,9 @@ class MCPSettingTab extends PluginSettingTab {
 		configEl.textContent = JSON.stringify(configJson, null, 2);
 		
 		// Option 2: Via mcp-remote
-		info.createEl('p', {text: 'Option 2: Via mcp-remote (recommended for Claude Desktop):'}).style.fontWeight = 'bold';
+		info.createEl('p', {text: 'Option 2: Via mcp-remote (for Claude Desktop):'}).style.fontWeight = 'bold';
 		const remoteDesc = info.createEl('p', {
-			text: 'Claude Desktop may not support streaming HTTP transport yet. Use mcp-remote instead:',
+			text: 'mcp-remote supports authentication headers via the --header flag:',
 			cls: 'setting-item-description'
 		});
 		
@@ -729,19 +780,71 @@ class MCPSettingTab extends PluginSettingTab {
 		const remoteEl = remoteExample.createEl('pre');
 		remoteEl.classList.add('mcp-config-example');
 		
-		const remoteJson = {
+		const remoteJson = this.plugin.settings.dangerouslyDisableAuth ? {
 			"mcpServers": {
 				"obsidian-vault": {
 					"command": "npx",
 					"args": [
 						"mcp-remote",
-						`http://obsidian:${this.plugin.settings.apiKey}@localhost:${this.plugin.settings.httpPort}/mcp`
+						`http://localhost:${this.plugin.settings.httpPort}/mcp`
+					]
+				}
+			}
+		} : {
+			"mcpServers": {
+				"obsidian-vault": {
+					"command": "npx",
+					"args": [
+						"mcp-remote",
+						`http://localhost:${this.plugin.settings.httpPort}/mcp`,
+						"--header",
+						`Authorization: Bearer ${this.plugin.settings.apiKey}`
 					]
 				}
 			}
 		};
 		
 		remoteEl.textContent = JSON.stringify(remoteJson, null, 2);
+		
+		// Add note about Windows workaround
+		const windowsNote = info.createEl('p', {
+			text: 'Windows Users: If you have issues with spaces, use environment variables instead:',
+			cls: 'setting-item-description'
+		});
+		windowsNote.style.fontStyle = 'italic';
+		
+		const windowsExample = info.createDiv('desktop-config-example');
+		const windowsEl = windowsExample.createEl('pre');
+		windowsEl.classList.add('mcp-config-example');
+		
+		const windowsJson = this.plugin.settings.dangerouslyDisableAuth ? {
+			"mcpServers": {
+				"obsidian-vault": {
+					"command": "npx",
+					"args": [
+						"mcp-remote",
+						`http://localhost:${this.plugin.settings.httpPort}/mcp`
+					]
+				}
+			}
+		} : {
+			"mcpServers": {
+				"obsidian-vault": {
+					"command": "npx",
+					"args": [
+						"mcp-remote",
+						`http://localhost:${this.plugin.settings.httpPort}/mcp`,
+						"--header",
+						"Authorization:Bearer ${OBSIDIAN_API_KEY}"  // No space around colon
+					],
+					"env": {
+						"OBSIDIAN_API_KEY": this.plugin.settings.apiKey
+					}
+				}
+			}
+		};
+		
+		windowsEl.textContent = JSON.stringify(windowsJson, null, 2);
 		
 		const configPath = info.createEl('p', {
 			text: 'Configuration file location:'

@@ -271,6 +271,12 @@ export class MCPHttpServer {
         return next();
       }
       
+      // Check if auth is disabled
+      if (this.plugin?.settings?.dangerouslyDisableAuth) {
+        Debug.log('⚠️ Authentication is DISABLED - allowing access without credentials');
+        return next();
+      }
+      
       const apiKey = this.plugin?.settings?.apiKey;
       if (!apiKey) {
         // No API key configured, allow access (backward compatibility)
