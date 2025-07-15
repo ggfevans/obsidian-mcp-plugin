@@ -684,7 +684,9 @@ class MCPSettingTab extends PluginSettingTab {
 		const codeEl = commandExample.createEl('code');
 		codeEl.classList.add('mcp-code-block');
 		const apiKey = this.plugin.settings.apiKey;
-		codeEl.textContent = `claude mcp add obsidian http://obsidian:${apiKey}@localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
+		// Generate Basic Auth header value
+		const authHeader = Buffer.from(`obsidian:${apiKey}`).toString('base64');
+		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http --header "Authorization: Basic ${authHeader}"`;
 		
 		info.createEl('h4', {text: 'Client Configuration (Claude Desktop, Cline, etc.)'});
 		const desktopDesc = info.createEl('p', {
