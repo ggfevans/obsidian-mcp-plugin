@@ -920,12 +920,16 @@ class MCPSettingTab extends PluginSettingTab {
 			}
 		}
 		
-		// Update protocol information section
+		// Update protocol information section with proper auth handling
 		const protocolSection = document.querySelector('.protocol-command-example');
 		if (protocolSection) {
 			const codeBlock = protocolSection.querySelector('code');
-			if (codeBlock) {
-				codeBlock.textContent = `claude mcp add obsidian http://localhost:${info.port}/mcp --transport http`;
+			if (codeBlock && info) {
+				const claudeCommand = this.plugin.settings.dangerouslyDisableAuth ? 
+					`claude mcp add --transport http obsidian http://localhost:${info.port}/mcp` :
+					`claude mcp add --transport http obsidian http://localhost:${info.port}/mcp --header "Authorization: Bearer ${this.plugin.settings.apiKey}"`;
+				
+				codeBlock.textContent = claudeCommand;
 			}
 		}
 		
