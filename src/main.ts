@@ -2,6 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
 import { MCPHttpServer } from './mcp-server';
 import { getVersion } from './version';
 import { Debug } from './utils/debug';
+import { randomBytes } from 'crypto';
 
 interface MCPPluginSettings {
 	httpEnabled: boolean;
@@ -11,6 +12,7 @@ interface MCPPluginSettings {
 	autoDetectPortConflicts: boolean;
 	enableConcurrentSessions: boolean;
 	maxConcurrentConnections: number;
+	apiKey: string;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -20,7 +22,8 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	showConnectionStatus: true,
 	autoDetectPortConflicts: true,
 	enableConcurrentSessions: false, // Disabled by default for backward compatibility
-	maxConcurrentConnections: 32
+	maxConcurrentConnections: 32,
+	apiKey: '' // Will be generated on first load
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
@@ -186,6 +189,19 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		
+		// Generate API key on first load if not present
+		if (!this.settings.apiKey) {
+			this.settings.apiKey = this.generateApiKey();
+			await this.saveSettings();
+			Debug.log('🔐 Generated new API key for authentication');
+		}
+	}
+	
+	public generateApiKey(): string {
+		// Generate a secure random API key
+		const bytes = randomBytes(32);
+		return bytes.toString('base64url');
 	}
 
 	async saveSettings() {
@@ -380,6 +396,9 @@ class MCPSettingTab extends PluginSettingTab {
 		// Server Configuration Section
 		this.createServerConfigSection(containerEl);
 		
+		// Authentication Section
+		this.createAuthenticationSection(containerEl);
+		
 		// UI Options Section
 		this.createUIOptionsSection(containerEl);
 		
@@ -522,6 +541,59 @@ class MCPSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 	}
+	
+	private createAuthenticationSection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', {text: 'Authentication'});
+		
+		new Setting(containerEl)
+			.setName('API Key')
+			.setDesc('Secure API key for authenticating MCP clients')
+			.addText(text => {
+				const input = text
+					.setPlaceholder('API key will be shown here')
+					.setValue(this.plugin.settings.apiKey)
+					.setDisabled(true);
+				
+				// Make the text input wider to accommodate the key
+				input.inputEl.style.width = '300px';
+				input.inputEl.style.fontFamily = 'monospace';
+				
+				// Add a class for styling
+				input.inputEl.classList.add('mcp-api-key-input');
+				
+				return input;
+			})
+			.addButton(button => button
+				.setButtonText('Copy')
+				.setTooltip('Copy API key to clipboard')
+				.onClick(async () => {
+					await navigator.clipboard.writeText(this.plugin.settings.apiKey);
+					new Notice('API key copied to clipboard');
+				}))
+			.addButton(button => button
+				.setButtonText('Regenerate')
+				.setTooltip('Generate a new API key')
+				.setWarning()
+				.onClick(async () => {
+					// Show confirmation dialog
+					const confirmed = confirm('Are you sure you want to regenerate the API key? This will invalidate the current key and require updating all MCP clients.');
+					
+					if (confirmed) {
+						this.plugin.settings.apiKey = this.plugin.generateApiKey();
+						await this.plugin.saveSettings();
+						new Notice('API key regenerated. Update your MCP clients with the new key.');
+						this.display(); // Refresh the settings display
+					}
+				}));
+		
+		// Add a note about security
+		const securityNote = containerEl.createEl('p', {
+			text: 'Note: The API key is stored in the plugin settings file. Anyone with access to your vault can read it.',
+			cls: 'setting-item-description'
+		});
+		securityNote.style.marginTop = '-10px';
+		securityNote.style.marginBottom = '20px';
+	}
 
 	private createUIOptionsSection(containerEl: HTMLElement): void {
 		containerEl.createEl('h3', {text: 'Interface Options'});
@@ -611,7 +683,8 @@ class MCPSettingTab extends PluginSettingTab {
 		const commandExample = info.createDiv('protocol-command-example');
 		const codeEl = commandExample.createEl('code');
 		codeEl.classList.add('mcp-code-block');
-		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
+		const apiKey = this.plugin.settings.apiKey;
+		codeEl.textContent = `claude mcp add obsidian http://obsidian:${apiKey}@localhost:${this.plugin.settings.httpPort}/mcp --transport http`;
 		
 		info.createEl('h4', {text: 'Client Configuration (Claude Desktop, Cline, etc.)'});
 		const desktopDesc = info.createEl('p', {
@@ -629,7 +702,7 @@ class MCPSettingTab extends PluginSettingTab {
 				"obsidian": {
 					"transport": {
 						"type": "http",
-						"url": `http://localhost:${this.plugin.settings.httpPort}/mcp`
+						"url": `http://obsidian:${this.plugin.settings.apiKey}@localhost:${this.plugin.settings.httpPort}/mcp`
 					}
 				}
 			}
@@ -654,7 +727,7 @@ class MCPSettingTab extends PluginSettingTab {
 					"command": "npx",
 					"args": [
 						"mcp-remote",
-						`http://localhost:${this.plugin.settings.httpPort}/mcp`
+						`http://obsidian:${this.plugin.settings.apiKey}@localhost:${this.plugin.settings.httpPort}/mcp`
 					]
 				}
 			}

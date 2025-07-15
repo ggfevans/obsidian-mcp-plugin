@@ -254,6 +254,40 @@ export class MCPHttpServer {
 
     // JSON body parser
     this.app.use(express.json());
+    
+    // Authentication middleware - check API key
+    this.app.use((req, res, next) => {
+      // Skip auth for OPTIONS requests (CORS preflight)
+      if (req.method === 'OPTIONS') {
+        return next();
+      }
+      
+      const apiKey = this.plugin?.settings?.apiKey;
+      if (!apiKey) {
+        // No API key configured, allow access (backward compatibility)
+        return next();
+      }
+      
+      // Check Authorization header for Basic Auth
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Basic ')) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      
+      // Decode Basic Auth credentials
+      const base64Credentials = authHeader.slice(6);
+      const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
+      const [username, password] = credentials.split(':');
+      
+      // Username can be anything (we use 'obsidian'), password must match API key
+      if (password !== apiKey) {
+        res.status(401).json({ error: 'Invalid API key' });
+        return;
+      }
+      
+      next();
+    });
 
     // Request logging for debugging
     this.app.use((req, res, next) => {
