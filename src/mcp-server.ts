@@ -278,25 +278,36 @@ export class MCPHttpServer {
         return next();
       }
       
-      // Check Authorization header for Basic Auth
+      // Check Authorization header for Bearer or Basic Auth
       const authHeader = req.headers.authorization;
       Debug.log(`🔐 Auth check - Header present: ${!!authHeader}, API key set: ${!!apiKey}`);
       
-      if (!authHeader || !authHeader.startsWith('Basic ')) {
-        Debug.log('❌ Auth failed: Missing or invalid Authorization header');
+      if (!authHeader) {
+        Debug.log('❌ Auth failed: Missing Authorization header');
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
       
-      // Decode Basic Auth credentials
-      const base64Credentials = authHeader.slice(6);
-      const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
-      const [username, password] = credentials.split(':');
+      let authenticated = false;
       
-      Debug.log(`🔐 Auth check - Username: ${username}, Password matches: ${password === apiKey}`);
+      // Check for Bearer token
+      if (authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        authenticated = (token === apiKey);
+        Debug.log(`🔐 Bearer auth - Token matches: ${authenticated}`);
+      } 
+      // Check for Basic auth
+      else if (authHeader.startsWith('Basic ')) {
+        const base64Credentials = authHeader.slice(6);
+        const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
+        const [username, password] = credentials.split(':');
+        authenticated = (password === apiKey);
+        Debug.log(`🔐 Basic auth - Username: ${username}, Password matches: ${authenticated}`);
+      } else {
+        Debug.log('❌ Auth failed: Invalid Authorization header format');
+      }
       
-      // Username can be anything (we use 'obsidian'), password must match API key
-      if (password !== apiKey) {
+      if (!authenticated) {
         Debug.log('❌ Auth failed: Invalid API key');
         res.status(401).json({ error: 'Invalid API key' });
         return;

@@ -592,7 +592,15 @@ class MCPSettingTab extends PluginSettingTab {
 			cls: 'setting-item-description'
 		});
 		securityNote.style.marginTop = '-10px';
-		securityNote.style.marginBottom = '20px';
+		securityNote.style.marginBottom = '10px';
+		
+		// Add note about auth methods
+		const authNote = containerEl.createEl('p', {
+			text: 'Supports both Bearer token (recommended) and Basic authentication.',
+			cls: 'setting-item-description'
+		});
+		authNote.style.marginTop = '-10px';
+		authNote.style.marginBottom = '20px';
 	}
 
 	private createUIOptionsSection(containerEl: HTMLElement): void {
@@ -684,9 +692,7 @@ class MCPSettingTab extends PluginSettingTab {
 		const codeEl = commandExample.createEl('code');
 		codeEl.classList.add('mcp-code-block');
 		const apiKey = this.plugin.settings.apiKey;
-		// Generate Basic Auth header value
-		const authHeader = Buffer.from(`obsidian:${apiKey}`).toString('base64');
-		codeEl.textContent = `claude mcp add obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --transport http --header "Authorization: Basic ${authHeader}"`;
+		codeEl.textContent = `claude mcp add --transport http obsidian http://localhost:${this.plugin.settings.httpPort}/mcp --header "Authorization: Bearer ${apiKey}"`;
 		
 		info.createEl('h4', {text: 'Client Configuration (Claude Desktop, Cline, etc.)'});
 		const desktopDesc = info.createEl('p', {
