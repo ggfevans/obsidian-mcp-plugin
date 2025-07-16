@@ -48,11 +48,15 @@ export class MCPHttpServer {
     
     // Initialize ObsidianAPI with security if read-only mode is enabled
     if (plugin?.settings?.readOnlyMode) {
-      Debug.log('🔒 Read-only mode enabled - using SecureObsidianAPI');
+      Debug.log('🔒 READ-ONLY MODE ACTIVATED - All write operations will be blocked');
+      Debug.log('🔐 Security: Using SecureObsidianAPI with read-only permissions');
       
       // Use SecureObsidianAPI with read-only preset settings
       this.obsidianAPI = new SecureObsidianAPI(obsidianApp, undefined, plugin, VaultSecurityManager.presets.readOnly());
     } else {
+      Debug.log('✅ READ-ONLY MODE DEACTIVATED - All operations allowed');
+      Debug.log('🔓 Security: Using standard ObsidianAPI');
+      
       // Use regular ObsidianAPI
       this.obsidianAPI = new ObsidianAPI(obsidianApp, undefined, plugin);
     }

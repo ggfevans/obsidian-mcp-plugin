@@ -45,6 +45,13 @@ export default class ObsidianMCPPlugin extends Plugin {
 			await this.loadSettings();
 			Debug.setDebugMode(this.settings.debugLogging);
 			Debug.log('✅ Settings loaded');
+			
+			// Debug log read-only mode status at startup
+			if (this.settings.readOnlyMode) {
+				Debug.log('🔒 READ-ONLY MODE detected in settings - will activate on server start');
+			} else {
+				Debug.log('✅ READ-ONLY MODE not enabled - normal operations mode');
+			}
 
 			// Initialize vault context tracking
 			this.initializeVaultContext();
@@ -643,10 +650,12 @@ class MCPSettingTab extends PluginSettingTab {
 					this.plugin.settings.readOnlyMode = value;
 					await this.plugin.saveSettings();
 					
-					// Show notice about the change
+					// Debug logging for read-only mode changes
 					if (value) {
+						Debug.log('🔒 READ-ONLY MODE ENABLED via settings - Server restart required for activation');
 						new Notice('🔒 Read-only mode enabled. All write operations are blocked.');
 					} else {
+						Debug.log('✅ READ-ONLY MODE DISABLED via settings - Server restart required for deactivation');
 						new Notice('✅ Read-only mode disabled. All operations are allowed.');
 					}
 					
