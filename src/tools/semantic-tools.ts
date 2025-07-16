@@ -26,6 +26,31 @@ const createSemanticTool = (operation: string) => ({
   },
   handler: async (api: ObsidianAPI, args: any) => {
     const app = api.getApp();
+    
+    // Check for read-only mode before processing write operations
+    if ((api as any).plugin?.settings?.readOnlyMode && operation === 'vault') {
+      const writeOperations = ['create', 'update', 'delete', 'move', 'rename', 'copy', 'split', 'combine', 'concatenate'];
+      if (writeOperations.includes(args.action)) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: {
+                code: 'READ_ONLY_MODE',
+                message: `Write operation '${args.action}' is blocked - read-only mode is enabled`
+              },
+              context: {
+                readOnlyMode: true,
+                operation: operation,
+                action: args.action,
+                blockedOperation: true
+              }
+            }, null, 2)
+          }]
+        };
+      }
+    }
+    
     const router = new SemanticRouter(api, app);
     
     const request: SemanticRequest = {
