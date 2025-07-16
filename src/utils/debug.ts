@@ -17,6 +17,10 @@ export class Debug {
         this.debugEnabled = enabled;
     }
     
+    static isDebugMode(): boolean {
+        return this.debugEnabled;
+    }
+    
     static log(message: string, ...args: any[]): void {
         if (this.debugEnabled) {
             console.log(`[MCP] ${message}`, ...args);

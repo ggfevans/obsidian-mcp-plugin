@@ -87,3 +87,8 @@ export class Setting {
   addToggle(cb: any) { return this; }
   addText(cb: any) { return this; }
 }
+
+export function normalizePath(path: string): string {
+  // Simple normalization for testing
+  return path.replace(/\\/g, '/');
+}
