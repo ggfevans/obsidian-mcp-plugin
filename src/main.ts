@@ -14,6 +14,7 @@ interface MCPPluginSettings {
 	maxConcurrentConnections: number;
 	apiKey: string;
 	dangerouslyDisableAuth: boolean;
+	readOnlyMode: boolean;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -25,7 +26,8 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	enableConcurrentSessions: false, // Disabled by default for backward compatibility
 	maxConcurrentConnections: 32,
 	apiKey: '', // Will be generated on first load
-	dangerouslyDisableAuth: false // Auth enabled by default
+	dangerouslyDisableAuth: false, // Auth enabled by default
+	readOnlyMode: false // Read-only mode disabled by default
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
@@ -401,6 +403,9 @@ class MCPSettingTab extends PluginSettingTab {
 		// Authentication Section
 		this.createAuthenticationSection(containerEl);
 		
+		// Security Section
+		this.createSecuritySection(containerEl);
+		
 		// UI Options Section
 		this.createUIOptionsSection(containerEl);
 		
@@ -619,6 +624,30 @@ class MCPSettingTab extends PluginSettingTab {
 						new Notice('⚠️ Authentication disabled! Your vault is accessible without credentials.');
 					} else {
 						new Notice('✅ Authentication enabled. API key required for access.');
+					}
+					
+					// Refresh display to update examples
+					this.display();
+				}));
+	}
+
+	private createSecuritySection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', {text: 'Security'});
+		
+		new Setting(containerEl)
+			.setName('Read-Only Mode')
+			.setDesc('Enable read-only mode - blocks all write operations (create, update, delete, move, rename)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.readOnlyMode)
+				.onChange(async (value) => {
+					this.plugin.settings.readOnlyMode = value;
+					await this.plugin.saveSettings();
+					
+					// Show notice about the change
+					if (value) {
+						new Notice('🔒 Read-only mode enabled. All write operations are blocked.');
+					} else {
+						new Notice('✅ Read-only mode disabled. All operations are allowed.');
 					}
 					
 					// Refresh display to update examples

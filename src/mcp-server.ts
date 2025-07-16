@@ -17,6 +17,7 @@ import { randomUUID } from 'crypto';
 import * as path from 'path';
 import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
+import { SecureObsidianAPI, VaultSecurityManager } from './security';
 import { semanticTools } from './tools/semantic-tools';
 import { Debug } from './utils/debug';
 import { ConnectionPool, PooledRequest } from './utils/connection-pool';
@@ -45,8 +46,16 @@ export class MCPHttpServer {
     this.port = port;
     this.plugin = plugin;
     
-    // Initialize ObsidianAPI with direct plugin access
-    this.obsidianAPI = new ObsidianAPI(obsidianApp, undefined, plugin);
+    // Initialize ObsidianAPI with security if read-only mode is enabled
+    if (plugin?.settings?.readOnlyMode) {
+      Debug.log('🔒 Read-only mode enabled - using SecureObsidianAPI');
+      
+      // Use SecureObsidianAPI with read-only preset settings
+      this.obsidianAPI = new SecureObsidianAPI(obsidianApp, undefined, plugin, VaultSecurityManager.presets.readOnly());
+    } else {
+      // Use regular ObsidianAPI
+      this.obsidianAPI = new ObsidianAPI(obsidianApp, undefined, plugin);
+    }
     
     // Initialize connection pool and session manager if concurrent sessions are enabled
     if (plugin?.settings?.enableConcurrentSessions) {

@@ -13,3 +13,7 @@ export {
 	type VaultOperation,
 	type ValidatedOperation
 } from './vault-security-manager';
+
+export { 
+	SecureObsidianAPI 
+} from './secure-obsidian-api';
