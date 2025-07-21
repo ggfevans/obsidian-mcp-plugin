@@ -5,6 +5,7 @@ import { isImageFile as checkIsImageFile, processImageResponse, IMAGE_PROCESSING
 import { getVersion } from '../version';
 import { SearchResult } from './advanced-search';
 import { MCPIgnoreManager } from '../security/mcp-ignore-manager';
+import { Debug } from './debug';
 
 export class ObsidianAPI {
   private app: App;
@@ -17,6 +18,7 @@ export class ObsidianAPI {
     this.config = config || { apiKey: '', apiUrl: '' };
     this.plugin = plugin;
     this.ignoreManager = plugin?.ignoreManager;
+    Debug.log(`ObsidianAPI initialized with ignoreManager: ${!!this.ignoreManager}, enabled: ${this.ignoreManager?.getEnabled()}`);
   }
 
   // Getter to access the App instance for graph operations
