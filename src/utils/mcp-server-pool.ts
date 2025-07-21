@@ -2,6 +2,7 @@ import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { EventEmitter } from 'events';
 import { Debug } from './debug';
 import { ObsidianAPI } from './obsidian-api';
+import { SecureObsidianAPI } from '../security/secure-obsidian-api';
 import { semanticTools } from '../tools/semantic-tools';
 import { getVersion } from '../version';
 import {
@@ -23,12 +24,12 @@ interface PooledServer {
 export class MCPServerPool extends EventEmitter {
   private servers: Map<string, PooledServer> = new Map();
   private maxServers: number;
-  private obsidianAPI: ObsidianAPI;
+  private obsidianAPI: ObsidianAPI | SecureObsidianAPI;
   private plugin: any;
   private sessionManager?: any;
   private connectionPool?: any;
 
-  constructor(obsidianAPI: ObsidianAPI, maxServers: number = 32, plugin?: any) {
+  constructor(obsidianAPI: ObsidianAPI | SecureObsidianAPI, maxServers: number = 32, plugin?: any) {
     super();
     this.obsidianAPI = obsidianAPI;
     this.maxServers = maxServers;
@@ -99,7 +100,15 @@ export class MCPServerPool extends EventEmitter {
     );
 
     // Create session-specific API instance
-    const sessionAPI = new ObsidianAPI(this.obsidianAPI.getApp(), undefined, this.plugin);
+    // If the main API is SecureObsidianAPI, create a matching secure instance
+    const sessionAPI = this.obsidianAPI instanceof SecureObsidianAPI 
+      ? new SecureObsidianAPI(
+          this.obsidianAPI.getApp(), 
+          undefined, 
+          this.plugin,
+          (this.obsidianAPI as SecureObsidianAPI).getSecuritySettings()
+        )
+      : new ObsidianAPI(this.obsidianAPI.getApp(), undefined, this.plugin);
 
     // Register tools handler
     server.setRequestHandler(ListToolsRequestSchema, async () => {

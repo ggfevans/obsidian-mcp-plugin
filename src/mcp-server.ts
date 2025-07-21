@@ -46,20 +46,35 @@ export class MCPHttpServer {
     this.port = port;
     this.plugin = plugin;
     
-    // Initialize ObsidianAPI with security if read-only mode is enabled
+    // Always use SecureObsidianAPI with VaultSecurityManager as our firewall
+    Debug.log('🔐 Initializing VaultSecurityManager firewall');
+    
+    // Configure security rules based on mode
+    let securitySettings;
     if (plugin?.settings?.readOnlyMode) {
-      Debug.log('🔒 READ-ONLY MODE ACTIVATED - All write operations will be blocked');
-      Debug.log('🔐 Security: Using SecureObsidianAPI with read-only permissions');
-      
-      // Use SecureObsidianAPI with read-only preset settings
-      this.obsidianAPI = new SecureObsidianAPI(obsidianApp, undefined, plugin, VaultSecurityManager.presets.readOnly());
+      Debug.log('🔒 READ-ONLY MODE ACTIVATED - Loading restrictive ruleset');
+      securitySettings = VaultSecurityManager.presets.readOnly();
     } else {
-      Debug.log('✅ READ-ONLY MODE DEACTIVATED - All operations allowed');
-      Debug.log('🔓 Security: Using standard ObsidianAPI');
-      
-      // Use regular ObsidianAPI
-      this.obsidianAPI = new ObsidianAPI(obsidianApp, undefined, plugin);
+      Debug.log('✅ READ-ONLY MODE DEACTIVATED - Loading permissive ruleset');
+      // Minimal security - just path validation and .mcpignore blocking
+      securitySettings = {
+        pathValidation: 'strict' as const,  // Always validate paths for security
+        permissions: {
+          read: true,
+          create: true,
+          update: true,
+          delete: true,
+          move: true,
+          rename: true,
+          execute: true
+        },
+        blockedPaths: [],  // .mcpignore will handle blocking
+        logSecurityEvents: false
+      };
     }
+    
+    // Always use SecureObsidianAPI for consistent security layer
+    this.obsidianAPI = new SecureObsidianAPI(obsidianApp, undefined, plugin, securitySettings);
     
     // Initialize connection pool and session manager if concurrent sessions are enabled
     if (plugin?.settings?.enableConcurrentSessions) {
