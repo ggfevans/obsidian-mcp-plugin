@@ -6,6 +6,13 @@ describe('MCPHttpServer', () => {
 
   beforeEach(() => {
     mockApp = new App();
+    // Mock the vault adapter for the SecurePathValidator
+    mockApp.vault = {
+      ...mockApp.vault,
+      adapter: {
+        basePath: '/mock/vault/path'
+      }
+    } as any;
   });
 
   test('should create server instance', () => {
