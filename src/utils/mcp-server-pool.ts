@@ -100,15 +100,22 @@ export class MCPServerPool extends EventEmitter {
     );
 
     // Create session-specific API instance
-    // If the main API is SecureObsidianAPI, create a matching secure instance
-    const sessionAPI = this.obsidianAPI instanceof SecureObsidianAPI 
-      ? new SecureObsidianAPI(
-          this.obsidianAPI.getApp(), 
-          undefined, 
-          this.plugin,
-          (this.obsidianAPI as SecureObsidianAPI).getSecuritySettings()
-        )
-      : new ObsidianAPI(this.obsidianAPI.getApp(), undefined, this.plugin);
+    // Always create SecureObsidianAPI if the main API has security settings
+    let sessionAPI: ObsidianAPI | SecureObsidianAPI;
+    if ('getSecuritySettings' in this.obsidianAPI) {
+      // Main API is SecureObsidianAPI - create matching secure instance
+      sessionAPI = new SecureObsidianAPI(
+        this.obsidianAPI.getApp(), 
+        undefined, 
+        this.plugin,
+        (this.obsidianAPI as any).getSecuritySettings()
+      );
+      Debug.log(`🔐 Created secure session API for session ${sessionId}`);
+    } else {
+      // Fallback to regular ObsidianAPI
+      sessionAPI = new ObsidianAPI(this.obsidianAPI.getApp(), undefined, this.plugin);
+      Debug.log(`⚠️ Created regular session API for session ${sessionId} (no security)`);
+    }
 
     // Register tools handler
     server.setRequestHandler(ListToolsRequestSchema, async () => {
