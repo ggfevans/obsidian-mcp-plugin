@@ -1,5 +1,6 @@
 import { App } from 'obsidian';
 import { Minimatch } from 'minimatch';
+import { Debug } from '../utils/debug';
 
 /**
  * MCPIgnoreManager - Handles .mcpignore file-based path exclusions
@@ -56,13 +57,13 @@ export class MCPIgnoreManager {
       this.parseIgnoreContent(content);
       this.lastModified = stat?.mtime || Date.now();
       
-      console.log(`MCPIgnore: Loaded ${this.patterns.length} exclusion patterns`);
+      Debug.log(`MCPIgnore: Loaded ${this.patterns.length} exclusion patterns`);
     } catch (error) {
       // File doesn't exist or can't be read - no exclusions
       this.patterns = [];
       this.matchers = [];
       this.lastModified = 0;
-      console.log('MCPIgnore: No .mcpignore file found, no exclusions active');
+      Debug.log('MCPIgnore: No .mcpignore file found, no exclusions active');
     }
   }
 
@@ -104,7 +105,7 @@ export class MCPIgnoreManager {
         validPatterns.push(trimmed);
         matchers.push(matcher);
       } catch (error) {
-        console.warn(`MCPIgnore: Invalid pattern "${trimmed}": ${error}`);
+        Debug.log(`MCPIgnore: Invalid pattern "${trimmed}": ${error}`);
       }
     }
 
@@ -223,9 +224,9 @@ export class MCPIgnoreManager {
 
     try {
       await this.app.vault.adapter.write(this.ignorePath, template);
-      console.log(`MCPIgnore: Created default .mcpignore file at ${this.ignorePath}`);
+      Debug.log(`MCPIgnore: Created default .mcpignore file at ${this.ignorePath}`);
     } catch (error) {
-      console.error(`MCPIgnore: Failed to create .mcpignore file: ${error}`);
+      Debug.log(`MCPIgnore: Failed to create .mcpignore file: ${error}`);
       throw error;
     }
   }

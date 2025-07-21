@@ -710,12 +710,12 @@ class MCPSettingTab extends PluginSettingTab {
 	}
 
 	private createPathExclusionManagement(containerEl: HTMLElement): void {
-		console.log('Creating path exclusion management UI');
+		Debug.log('Creating path exclusion management UI');
 		const exclusionSection = containerEl.createDiv('mcp-exclusion-section');
 		exclusionSection.createEl('h4', {text: '.mcpignore File Management'});
 
 		if (this.plugin.ignoreManager) {
-			console.log('Ignore manager available, creating buttons');
+			Debug.log('Ignore manager available, creating buttons');
 			const stats = this.plugin.ignoreManager.getStats();
 			
 			// Status info
@@ -740,54 +740,41 @@ class MCPSettingTab extends PluginSettingTab {
 				text: 'Open in default app',
 				cls: 'mod-cta'
 			});
-			console.log('Created open button:', openButton);
 			openButton.addEventListener('click', async () => {
-				console.log('OPEN BUTTON CLICKED!');  // This should show if button works
+				Debug.log('Open in default app button clicked');
 				try {
-					console.log('Inside try block - checking file exists...');
 					const exists = await this.plugin.ignoreManager!.ignoreFileExists();
-					console.log('File exists?', exists);
 					if (!exists) {
 						await this.plugin.ignoreManager!.createDefaultIgnoreFile();
 					}
 					
-					console.log('Getting file from vault, path:', stats.filePath);
-					console.log('this.app available?', !!this.app);
 					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
-					console.log('Got file?', !!file, file);
+					Debug.log(`File from vault: ${!!file}, path: ${stats.filePath}`);
 					
 					// Whether or not Obsidian has the file indexed, we know it exists
 					// So let's construct the path directly
 					try {
 						const adapter = this.app.vault.adapter as any;
-						console.log('Adapter:', adapter);
-						console.log('Adapter basePath:', adapter.basePath);
-						
 						const path = require('path');
 						const fullPath = path.join(adapter.basePath || '', stats.filePath);
-						console.log('Full path constructed:', fullPath);
+						Debug.log(`Opening file at: ${fullPath}`);
 						
 						// Try to access electron shell
 						const electron = require('electron');
-						console.log('Electron available:', !!electron);
-						console.log('Shell available:', !!electron?.shell);
-						
 						if (electron?.shell) {
-							console.log('Calling shell.openPath...');
 							const result = await electron.shell.openPath(fullPath);
-							console.log('Shell.openPath result:', result);
+							Debug.log(`Shell.openPath result: ${result}`);
 							new Notice('📝 .mcpignore file opened in default app');
 						} else {
-							console.log('Shell not available');
+							Debug.log('Electron shell not available');
 							new Notice('❌ Unable to open in external app');
 						}
 					} catch (err: any) {
-						console.error('Error opening file:', err);
+						Debug.log(`Error opening file: ${err?.message || err}`);
 						new Notice('❌ Failed to open file: ' + (err?.message || err));
 					}
 				} catch (error) {
-					console.error('OUTER CATCH - Failed to open .mcpignore file:', error);
-					console.error('Error details:', error);
+					Debug.log(`Failed to open .mcpignore file: ${error}`);
 					new Notice('❌ Failed to open .mcpignore file');
 				}
 			});
@@ -796,9 +783,8 @@ class MCPSettingTab extends PluginSettingTab {
 			const showButton = buttonContainer.createEl('button', {
 				text: 'Show in system explorer'
 			});
-			console.log('Created show button:', showButton);
 			showButton.addEventListener('click', async () => {
-				console.log('SHOW BUTTON CLICKED!');  // This should show if button works
+				Debug.log('Show in system explorer button clicked');
 				try {
 					const exists = await this.plugin.ignoreManager!.ignoreFileExists();
 					if (!exists) {
@@ -807,28 +793,25 @@ class MCPSettingTab extends PluginSettingTab {
 					
 					// Construct path directly, don't rely on Obsidian's file cache
 					try {
-						console.log('Attempting to show file in folder:', stats.filePath);
-						
 						const adapter = this.app.vault.adapter as any;
 						const path = require('path');
 						const fullPath = path.join(adapter.basePath || '', stats.filePath);
-						console.log('Full path for folder:', fullPath);
+						Debug.log(`Showing file in explorer: ${fullPath}`);
 						
 						const electron = require('electron');
 						if (electron?.shell) {
-							console.log('Calling shell.showItemInFolder...');
 							electron.shell.showItemInFolder(fullPath);
 							new Notice('📁 .mcpignore file location shown in explorer');
 						} else {
-							console.log('Shell not available for show in folder');
+							Debug.log('Electron shell not available for show in folder');
 							new Notice('❌ System explorer not available');
 						}
 					} catch (err: any) {
-						console.error('Error showing file in folder:', err);
+						Debug.log(`Error showing file in folder: ${err?.message || err}`);
 						new Notice('❌ Failed to show file: ' + (err?.message || err));
 					}
 				} catch (error) {
-					console.error('Failed to show .mcpignore file:', error);
+					Debug.log(`Failed to show .mcpignore file: ${error}`);
 					new Notice('❌ Failed to show file location');
 				}
 			});
