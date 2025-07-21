@@ -179,43 +179,69 @@ export class MCPIgnoreManager {
 # Lines starting with # are comments
 # Use ! to negate/whitelist patterns
 
-# === EXAMPLES (remove # to activate) ===
+# === PATTERN EXAMPLES ===
+# 
+# DIRECTORIES:
+# private/              # Excludes 'private' directory and ALL its contents
+# /private/             # Only excludes 'private' at vault root (not nested)
+# private               # Excludes any file or directory named 'private'
+#
+# WILDCARDS:
+# *.secret              # All files ending with .secret in any directory
+# secret.*              # All files starting with 'secret.' in any directory
+# *secret*              # Any file containing 'secret' in the name
+#
+# SPECIFIC PATHS:
+# daily/2024-01-15.md   # Excludes this specific file only
+# daily/*.md            # All .md files directly in daily/ (not subdirectories)
+# daily/**/*.md         # All .md files in daily/ and ALL subdirectories
+# daily/**/secret.md    # Files named secret.md in daily/ or any subdirectory
+#
+# NESTED PATTERNS:
+# work/*/confidential/  # Excludes 'confidential' dirs one level under work/
+# work/**/confidential/ # Excludes ALL 'confidential' dirs under work/
+# **/temp/              # Excludes ALL directories named 'temp' anywhere
+# 
+# COMPLEX PATTERNS:
+# archive/202[0-9]/**   # All content in archive/2020 through 2029
+# logs/*/debug-*.log    # Debug logs one level deep in logs/
+# !logs/*/debug-keep.log # But keep this specific debug log
 
-# Private directories
+# === COMMON USE CASES (remove # to activate) ===
+
+# Private/Personal content
 # private/
-# personal/**
+# personal/
 # journal/
+# diary/
 
-# Sensitive files by extension
-# *.secret
-# *.private
-# *.confidential
-
-# Specific sensitive files
-# passwords.md
-# api-keys.md
-# secrets.txt
-
-# Work/company separation
+# Work separation
 # work/confidential/
-# company-internal/
+# clients/*/contracts/
+# company-internal/**
 
-# Obsidian system files (if desired)
-# .obsidian/workspace*
-# .obsidian/graph.json
-
-# Temporary and backup files
+# Temporary files
 # *.tmp
 # *.backup
 # *.bak
-# temp/
-# drafts/
+# ~*
+# .#*
+
+# Development/Testing
+# test/
+# sandbox/
+# experiments/**/*.draft
+
+# Media files (if desired)
+# *.mp4
+# *.mov
+# attachments/videos/
 
 # === WHITELIST EXCEPTIONS ===
 # Use ! to include files that would otherwise be excluded
 # !private/shared-notes.md
 # !work/public-docs/
-# !*.public.secret
+# !**/*.public.md
 
 # === YOUR PATTERNS BELOW ===
 # Add your custom exclusion patterns here

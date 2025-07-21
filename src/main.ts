@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, TFolder, Menu } from 'obsidian';
 import { MCPHttpServer } from './mcp-server';
 import { getVersion } from './version';
 import { Debug } from './utils/debug';
@@ -17,6 +17,7 @@ interface MCPPluginSettings {
 	dangerouslyDisableAuth: boolean;
 	readOnlyMode: boolean;
 	pathExclusionsEnabled: boolean;
+	enableIgnoreContextMenu: boolean;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -30,7 +31,8 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	apiKey: '', // Will be generated on first load
 	dangerouslyDisableAuth: false, // Auth enabled by default
 	readOnlyMode: false, // Read-only mode disabled by default
-	pathExclusionsEnabled: false // Path exclusions disabled by default
+	pathExclusionsEnabled: false, // Path exclusions disabled by default
+	enableIgnoreContextMenu: false // Context menu disabled by default
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
@@ -90,6 +92,11 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 			// Setup vault monitoring
 			this.setupVaultMonitoring();
+
+			// Register context menu for path exclusions
+			if (this.settings.pathExclusionsEnabled && this.settings.enableIgnoreContextMenu) {
+				this.registerContextMenu();
+			}
 
 			// Start MCP server by default (unless explicitly disabled)
 			if (this.settings.httpEnabled) {
@@ -312,6 +319,57 @@ export default class ObsidianMCPPlugin extends Plugin {
 		} catch (error) {
 			return '';
 		}
+	}
+
+	public registerContextMenu(): void {
+		// Register file menu
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file) => {
+				if (!this.ignoreManager || !this.settings.pathExclusionsEnabled || !this.settings.enableIgnoreContextMenu) {
+					return;
+				}
+
+				menu.addItem((item) => {
+					item
+						.setTitle('Add to .mcpignore')
+						.setIcon('x-circle')
+						.onClick(async () => {
+							try {
+								// Ensure .mcpignore exists
+								const exists = await this.ignoreManager!.ignoreFileExists();
+								if (!exists) {
+									await this.ignoreManager!.createDefaultIgnoreFile();
+								}
+
+								// Get relative path from vault root
+								const relativePath = file.path;
+								let pattern = relativePath;
+
+								// If it's a folder, add trailing slash
+								if (file instanceof TFolder) {
+									pattern = relativePath + '/';
+								}
+
+								// Read current content
+								const currentContent = await this.app.vault.adapter.read('.mcpignore');
+								
+								// Append new pattern
+								const newContent = currentContent.trimEnd() + '\n' + pattern + '\n';
+								await this.app.vault.adapter.write('.mcpignore', newContent);
+
+								// Reload patterns
+								await this.ignoreManager!.forceReload();
+
+								new Notice(`✅ Added "${pattern}" to .mcpignore`);
+								Debug.log(`Added pattern to .mcpignore: ${pattern}`);
+							} catch (error) {
+								Debug.log('Failed to add to .mcpignore:', error);
+								new Notice('❌ Failed to add to .mcpignore');
+							}
+						});
+				});
+			})
+		);
 	}
 
 	private setupVaultMonitoring(): void {
@@ -703,6 +761,26 @@ class MCPSettingTab extends PluginSettingTab {
 					this.display();
 				}));
 
+		// Show context menu toggle if path exclusions are enabled
+		if (this.plugin.settings.pathExclusionsEnabled) {
+			new Setting(containerEl)
+				.setName('Enable right-click context menu')
+				.setDesc('Add "Add to .mcpignore" option to file/folder context menus')
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.enableIgnoreContextMenu)
+					.onChange(async (value) => {
+						this.plugin.settings.enableIgnoreContextMenu = value;
+						await this.plugin.saveSettings();
+						
+						if (value) {
+							this.plugin.registerContextMenu();
+							new Notice('✅ Context menu enabled - restart required for full effect');
+						} else {
+							new Notice('🔓 Context menu disabled - restart required for full effect');
+						}
+					}));
+		}
+
 		// Show file management options if path exclusions are enabled
 		if (this.plugin.settings.pathExclusionsEnabled) {
 			this.createPathExclusionManagement(containerEl);
@@ -722,6 +800,12 @@ class MCPSettingTab extends PluginSettingTab {
 			const statusEl = exclusionSection.createDiv('mcp-exclusion-status');
 			statusEl.createEl('p', {
 				text: `Current exclusions: ${stats.patternCount} patterns active`,
+				cls: 'setting-item-description'
+			});
+			
+			// Helper text
+			statusEl.createEl('p', {
+				text: 'Save patterns in .mcpignore file before reloading',
 				cls: 'setting-item-description'
 			});
 			
@@ -822,11 +906,18 @@ class MCPSettingTab extends PluginSettingTab {
 			});
 			templateButton.addEventListener('click', async () => {
 				try {
+					// Check if file already exists
+					const exists = await this.plugin.ignoreManager!.ignoreFileExists();
+					if (exists) {
+						new Notice('⚠️ .mcpignore file already exists');
+						return;
+					}
+					
 					await this.plugin.ignoreManager!.createDefaultIgnoreFile();
 					new Notice('📄 Default .mcpignore template created');
 					this.display(); // Refresh to update status
 				} catch (error) {
-					console.error('Failed to create .mcpignore template:', error);
+					Debug.log('Failed to create .mcpignore template:', error);
 					new Notice('❌ Failed to create template');
 				}
 			});
@@ -841,7 +932,7 @@ class MCPSettingTab extends PluginSettingTab {
 					new Notice('🔄 Exclusion patterns reloaded');
 					this.display(); // Refresh to update status
 				} catch (error) {
-					console.error('Failed to reload patterns:', error);
+					Debug.log('Failed to reload patterns:', error);
 					new Notice('❌ Failed to reload patterns');
 				}
 			});
