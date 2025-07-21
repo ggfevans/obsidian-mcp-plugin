@@ -25,6 +25,98 @@ Unlike basic tools that just return data, semantic tools are **self-guiding**. W
 - **High Performance**: Sub-100ms response times with direct vault access
 - **Concurrent Sessions**: Support for multiple AI agents working simultaneously (v0.5.8+)
 - **Worker Thread Processing**: CPU-intensive operations run in parallel threads for non-blocking performance
+- **Path Exclusions**: `.mcpignore` file support for blocking sensitive files from AI access
+- **Cloud Sync Friendly**: Smart retry logic handles file sync delays from iCloud, OneDrive, Dropbox, and other services
+
+## 🔐 Path Exclusions with .mcpignore
+
+Protect sensitive files and directories from AI access using `.gitignore`-style patterns.
+
+### Overview
+
+The plugin supports a `.mcpignore` file in your vault root that allows you to exclude specific files and directories from MCP operations. This provides a security layer ensuring that AI tools cannot access your private or sensitive content.
+
+### Setup
+
+1. **Enable in Settings**: Toggle "Enable Path Exclusions (.mcpignore)" in plugin settings
+2. **Create Template**: Click "Create Template" to generate a starter `.mcpignore` file with examples
+3. **Edit Patterns**: Use any text editor to add exclusion patterns
+
+### Pattern Syntax
+
+The `.mcpignore` file uses the same syntax as `.gitignore`:
+
+```
+# Directories
+private/              # Excludes 'private' directory and ALL its contents
+/private/            # Only excludes 'private' at vault root
+work/*/confidential/ # Excludes 'confidential' dirs one level under work/
+
+# Files
+secrets.md           # Excludes this specific file
+*.private           # All files ending with .private
+daily/*.md          # All .md files directly in daily/
+
+# Negation (whitelist)
+!public.private     # Allow this specific file despite *.private rule
+```
+
+### Features
+
+- **Auto-reload**: Changes to `.mcpignore` take effect immediately
+- **Context Menu**: Right-click any file/folder and select "Add to .mcpignore"
+- **UI Controls**: Manage from plugin settings with quick access buttons
+- **Security**: Blocked paths return `PATH_BLOCKED` errors with no data leakage
+- **Protected**: The `.mcpignore` file itself cannot be accessed via MCP
+
+### Example .mcpignore
+
+```
+# Personal content
+journal/
+diary/
+private/
+
+# Work files
+work/confidential/
+clients/*/contracts/
+
+# Temporary files
+*.tmp
+*.backup
+.#*
+
+# Allow specific files
+!work/public-docs/
+```
+
+## ☁️ Cloud Sync Friendly
+
+The plugin gracefully handles sync delays and file locking from cloud storage services.
+
+### Supported Services
+
+Works automatically with:
+- **iCloud Drive** - Handles `.icloud` sync artifacts and timing conflicts
+- **OneDrive** - Manages file locks and sync delays
+- **Dropbox** - Handles sync markers and temporary files
+- **Google Drive** - Manages sync state transitions
+- **Any sync service** - Universal retry logic works with all platforms
+
+### How It Works
+
+The plugin automatically:
+1. **Detects sync conflicts** - Recognizes EEXIST, EBUSY, and "file already exists" errors
+2. **Retries intelligently** - Uses exponential backoff (500ms → 1s → 2s)
+3. **Resolves timing issues** - Allows sync services time to complete operations
+4. **Works transparently** - No configuration needed, just works
+
+### Benefits
+
+- **No phantom files** - Resolves "file already exists" errors for non-existent files
+- **Reliable operations** - File creation, updates, and deletes work consistently
+- **Zero configuration** - Automatic detection and handling
+- **Cross-platform** - Same behavior on macOS, Windows, and Linux
 
 ## Installation
 
@@ -214,6 +306,8 @@ Access plugin settings via Obsidian Settings → Community Plugins → Obsidian 
 - **HTTP Port**: Port for MCP server (default: 3001)
 - **Enable Concurrent Sessions**: Allow multiple AI agents to work simultaneously (default: enabled)
 - **Max Concurrent Connections**: Maximum number of parallel operations (default: 32)
+- **Path Exclusions (.mcpignore)**: Enable/disable path blocking via `.mcpignore` file
+- **Enable Context Menu**: Add "Add to .mcpignore" to file/folder right-click menus
 - **Debug Logging**: Enable detailed console logging for troubleshooting
 
 ### Concurrent Sessions (v0.5.8+)
