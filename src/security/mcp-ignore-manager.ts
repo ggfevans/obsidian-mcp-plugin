@@ -136,7 +136,17 @@ export class MCPIgnoreManager {
     Debug.log(`🔍 MCPIgnore: checking ${this.matchers.length} patterns against "${normalizedPath}"`);
     for (let i = 0; i < this.matchers.length; i++) {
       const matcher = this.matchers[i];
-      const isMatch = matcher.match(normalizedPath);
+      let isMatch = matcher.match(normalizedPath);
+      
+      // .gitignore directory patterns: "dir/" should match "dir" and "dir/anything"
+      if (!isMatch && matcher.pattern.endsWith('/')) {
+        // Try matching without the trailing slash for the directory itself
+        const dirPattern = matcher.pattern.slice(0, -1);
+        const dirMatcher = new Minimatch(dirPattern, matcher.options);
+        isMatch = dirMatcher.match(normalizedPath);
+        Debug.log(`🔍 MCPIgnore: directory pattern fallback "${dirPattern}" -> match: ${isMatch}`);
+      }
+      
       Debug.log(`🔍 MCPIgnore: pattern ${i+1}: "${matcher.pattern}" (negate: ${matcher.negate}) -> match: ${isMatch}`);
       
       if (matcher.negate) {
