@@ -350,8 +350,14 @@ export default class ObsidianMCPPlugin extends Plugin {
 									pattern = relativePath + '/';
 								}
 
-								// Read current content
-								const currentContent = await this.app.vault.adapter.read('.mcpignore');
+								// Read current content or use empty string if file doesn't exist
+								let currentContent = '';
+								try {
+									currentContent = await this.app.vault.adapter.read('.mcpignore');
+								} catch (readError) {
+									Debug.log('.mcpignore not found when reading, will create new');
+									currentContent = '';
+								}
 								
 								// Append new pattern
 								const newContent = currentContent.trimEnd() + '\n' + pattern + '\n';
@@ -362,9 +368,10 @@ export default class ObsidianMCPPlugin extends Plugin {
 
 								new Notice(`✅ Added "${pattern}" to .mcpignore`);
 								Debug.log(`Added pattern to .mcpignore: ${pattern}`);
-							} catch (error) {
+							} catch (error: any) {
 								Debug.log('Failed to add to .mcpignore:', error);
-								new Notice('❌ Failed to add to .mcpignore');
+								const errorMsg = error?.message || 'Unknown error';
+								new Notice(`❌ Failed to add to .mcpignore: ${errorMsg}`);
 							}
 						});
 				});
@@ -914,6 +921,8 @@ class MCPSettingTab extends PluginSettingTab {
 					}
 					
 					await this.plugin.ignoreManager!.createDefaultIgnoreFile();
+					// Force reload to ensure fresh state
+					await this.plugin.ignoreManager!.forceReload();
 					new Notice('📄 Default .mcpignore template created');
 					this.display(); // Refresh to update status
 				} catch (error) {

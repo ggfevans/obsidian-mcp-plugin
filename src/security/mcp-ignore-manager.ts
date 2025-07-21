@@ -262,9 +262,12 @@ export class MCPIgnoreManager {
    */
   async ignoreFileExists(): Promise<boolean> {
     try {
-      await this.app.vault.adapter.stat(this.ignorePath);
-      return true;
-    } catch {
+      // Force fresh check - no caching
+      const stat = await this.app.vault.adapter.stat(this.ignorePath);
+      return stat !== null && stat !== undefined;
+    } catch (error) {
+      // File doesn't exist
+      Debug.log(`MCPIgnore: File check for ${this.ignorePath} - does not exist`);
       return false;
     }
   }
