@@ -5,7 +5,7 @@ import { Minimatch } from 'minimatch';
  * MCPIgnoreManager - Handles .mcpignore file-based path exclusions
  * 
  * Uses .gitignore-style patterns to exclude files and directories from MCP operations.
- * Patterns are stored in .obsidian/plugins/obsidian-mcp-plugin/.mcpignore
+ * Patterns are stored in .mcpignore at the vault root (like .gitignore)
  */
 export class MCPIgnoreManager {
   private app: App;
@@ -17,7 +17,7 @@ export class MCPIgnoreManager {
 
   constructor(app: App) {
     this.app = app;
-    this.ignorePath = '.obsidian/plugins/obsidian-mcp-plugin/.mcpignore';
+    this.ignorePath = '.mcpignore';
   }
 
   /**
