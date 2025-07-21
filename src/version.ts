@@ -1,4 +1,4 @@
 // Version is injected at build time by sync-version.mjs
 export function getVersion(): string {
-  return '0.7.2n';
+  return '0.7.2o';
 }

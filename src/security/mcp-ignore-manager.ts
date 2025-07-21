@@ -119,30 +119,42 @@ export class MCPIgnoreManager {
    * @returns true if path should be excluded
    */
   isExcluded(path: string): boolean {
+    Debug.log(`🔍 MCPIgnore.isExcluded called with path: "${path}"`);
+    
     if (!this.isEnabled || this.matchers.length === 0) {
+      Debug.log(`🔍 MCPIgnore: disabled or no matchers (enabled: ${this.isEnabled}, matchers: ${this.matchers.length})`);
       return false;
     }
 
     // Normalize path (remove leading slash, use forward slashes)
     const normalizedPath = path.replace(/^\/+/, '').replace(/\\/g, '/');
+    Debug.log(`🔍 MCPIgnore: normalized path "${path}" -> "${normalizedPath}"`);
     
     let excluded = false;
     
     // Process patterns in order - later patterns can override earlier ones
-    for (const matcher of this.matchers) {
+    Debug.log(`🔍 MCPIgnore: checking ${this.matchers.length} patterns against "${normalizedPath}"`);
+    for (let i = 0; i < this.matchers.length; i++) {
+      const matcher = this.matchers[i];
+      const isMatch = matcher.match(normalizedPath);
+      Debug.log(`🔍 MCPIgnore: pattern ${i+1}: "${matcher.pattern}" (negate: ${matcher.negate}) -> match: ${isMatch}`);
+      
       if (matcher.negate) {
         // Negation pattern - include if it matches
-        if (matcher.match(normalizedPath)) {
+        if (isMatch) {
           excluded = false;
+          Debug.log(`🔍 MCPIgnore: negation pattern matched, setting excluded = false`);
         }
       } else {
         // Normal pattern - exclude if it matches
-        if (matcher.match(normalizedPath)) {
+        if (isMatch) {
           excluded = true;
+          Debug.log(`🔍 MCPIgnore: normal pattern matched, setting excluded = true`);
         }
       }
     }
 
+    Debug.log(`🔍 MCPIgnore: final result for "${normalizedPath}": excluded = ${excluded}`);
     return excluded;
   }
 
