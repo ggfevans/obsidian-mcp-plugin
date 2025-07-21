@@ -747,8 +747,11 @@ class MCPSettingTab extends PluginSettingTab {
 					
 					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
 					if (file) {
-						// Use the electron shell API to open with default app
-						(this.app as any).openWithDefaultApp(file.path);
+						// Use electron's shell module directly
+						const { shell } = require('electron');
+						const path = require('path');
+						const fullPath = path.join((this.app.vault.adapter as any).basePath || '', file.path);
+						shell.openPath(fullPath);
 						new Notice('📝 .mcpignore file opened in default app');
 					}
 				} catch (error) {
@@ -770,8 +773,11 @@ class MCPSettingTab extends PluginSettingTab {
 					
 					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
 					if (file) {
-						// Use the electron shell API to show in folder
-						(this.app as any).showInFolder(file.path);
+						// Use electron's shell module to show in folder
+						const { shell } = require('electron');
+						const path = require('path');
+						const fullPath = path.join((this.app.vault.adapter as any).basePath || '', file.path);
+						shell.showItemInFolder(fullPath);
 						new Notice('📁 .mcpignore file location shown in explorer');
 					}
 				} catch (error) {
