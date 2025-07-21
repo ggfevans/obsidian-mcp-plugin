@@ -733,9 +733,9 @@ class MCPSettingTab extends PluginSettingTab {
 			// File management buttons
 			const buttonContainer = exclusionSection.createDiv('mcp-exclusion-buttons');
 			
-			// Open .mcpignore button
+			// Open in default app button
 			const openButton = buttonContainer.createEl('button', {
-				text: 'Open .mcpignore File',
+				text: 'Open in default app',
 				cls: 'mod-cta'
 			});
 			openButton.addEventListener('click', async () => {
@@ -747,13 +747,36 @@ class MCPSettingTab extends PluginSettingTab {
 					
 					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
 					if (file) {
-						const leaf = this.app.workspace.getUnpinnedLeaf();
-						await leaf.openFile(file as any);
-						new Notice('📝 .mcpignore file opened for editing');
+						// Use the electron shell API to open with default app
+						(this.app as any).openWithDefaultApp(file.path);
+						new Notice('📝 .mcpignore file opened in default app');
 					}
 				} catch (error) {
 					console.error('Failed to open .mcpignore file:', error);
 					new Notice('❌ Failed to open .mcpignore file');
+				}
+			});
+
+			// Show in system explorer button
+			const showButton = buttonContainer.createEl('button', {
+				text: 'Show in system explorer'
+			});
+			showButton.addEventListener('click', async () => {
+				try {
+					const exists = await this.plugin.ignoreManager!.ignoreFileExists();
+					if (!exists) {
+						await this.plugin.ignoreManager!.createDefaultIgnoreFile();
+					}
+					
+					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
+					if (file) {
+						// Use the electron shell API to show in folder
+						(this.app as any).showInFolder(file.path);
+						new Notice('📁 .mcpignore file location shown in explorer');
+					}
+				} catch (error) {
+					console.error('Failed to show .mcpignore file:', error);
+					new Notice('❌ Failed to show file location');
 				}
 			});
 
