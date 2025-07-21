@@ -4,15 +4,19 @@ import { paginateResults, paginateFiles } from './response-limiter';
 import { isImageFile as checkIsImageFile, processImageResponse, IMAGE_PROCESSING_PRESETS } from './image-handler';
 import { getVersion } from '../version';
 import { SearchResult } from './advanced-search';
+import { MCPIgnoreManager } from '../security/mcp-ignore-manager';
 
 export class ObsidianAPI {
   private app: App;
   private config: ObsidianConfig;
   private plugin?: any; // Reference to the plugin for accessing MCP server info
+  private ignoreManager?: MCPIgnoreManager;
+  
   constructor(app: App, config?: ObsidianConfig, plugin?: any) {
     this.app = app;
     this.config = config || { apiKey: '', apiUrl: '' };
     this.plugin = plugin;
+    this.ignoreManager = plugin?.ignoreManager;
   }
 
   // Getter to access the App instance for graph operations
@@ -122,11 +126,14 @@ export class ObsidianAPI {
       files = vault.getAllLoadedFiles();
     }
 
-    // Return file paths, filtering out folders unless specifically requested
-    return files
+    // Return file paths, filtering out folders and excluded paths
+    const filePaths = files
       .filter(file => file instanceof TFile)
       .map(file => file.path)
       .sort();
+    
+    // Filter out excluded paths
+    return this.ignoreManager ? this.ignoreManager.filterPaths(filePaths) : filePaths;
   }
 
   async listFilesPaginated(
@@ -189,6 +196,11 @@ export class ObsidianAPI {
   }
 
   async getFile(path: string): Promise<ObsidianFileResponse> {
+    // Check if path is excluded
+    if (this.ignoreManager && this.ignoreManager.isExcluded(path)) {
+      throw new Error(`File not found: ${path}`);
+    }
+    
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!file || !(file instanceof TFile)) {
       throw new Error(`File not found: ${path}`);
@@ -212,6 +224,11 @@ export class ObsidianAPI {
   }
 
   async createFile(path: string, content: string) {
+    // Check if path is excluded
+    if (this.ignoreManager && this.ignoreManager.isExcluded(path)) {
+      throw new Error(`Access denied: ${path}`);
+    }
+    
     // Ensure directory exists
     const dirPath = path.substring(0, path.lastIndexOf('/'));
     if (dirPath && !this.app.vault.getAbstractFileByPath(dirPath)) {
@@ -687,7 +704,13 @@ export class ObsidianAPI {
     includeContent: boolean
   ): Promise<SearchResult[]> {
     const searchTerm = this.parseSearchQuery(query);
-    const files = this.app.vault.getFiles();
+    const allFiles = this.app.vault.getFiles();
+    
+    // Filter out excluded files before searching
+    const files = this.ignoreManager ? 
+      allFiles.filter(file => !this.ignoreManager!.isExcluded(file.path)) : 
+      allFiles;
+    
     const results: SearchResult[] = [];
 
     for (const file of files) {

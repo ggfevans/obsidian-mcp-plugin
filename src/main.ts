@@ -2,6 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
 import { MCPHttpServer } from './mcp-server';
 import { getVersion } from './version';
 import { Debug } from './utils/debug';
+import { MCPIgnoreManager } from './security/mcp-ignore-manager';
 import { randomBytes } from 'crypto';
 
 interface MCPPluginSettings {
@@ -15,6 +16,7 @@ interface MCPPluginSettings {
 	apiKey: string;
 	dangerouslyDisableAuth: boolean;
 	readOnlyMode: boolean;
+	pathExclusionsEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: MCPPluginSettings = {
@@ -27,12 +29,14 @@ const DEFAULT_SETTINGS: MCPPluginSettings = {
 	maxConcurrentConnections: 32,
 	apiKey: '', // Will be generated on first load
 	dangerouslyDisableAuth: false, // Auth enabled by default
-	readOnlyMode: false // Read-only mode disabled by default
+	readOnlyMode: false, // Read-only mode disabled by default
+	pathExclusionsEnabled: false // Path exclusions disabled by default
 };
 
 export default class ObsidianMCPPlugin extends Plugin {
 	settings!: MCPPluginSettings;
 	mcpServer?: MCPHttpServer;
+	ignoreManager?: MCPIgnoreManager;
 	private currentVaultName: string = '';
 	private currentVaultPath: string = '';
 	private vaultSwitchTimeout?: number;
@@ -51,6 +55,16 @@ export default class ObsidianMCPPlugin extends Plugin {
 				Debug.log('🔒 READ-ONLY MODE detected in settings - will activate on server start');
 			} else {
 				Debug.log('✅ READ-ONLY MODE not enabled - normal operations mode');
+			}
+
+			// Initialize ignore manager
+			this.ignoreManager = new MCPIgnoreManager(this.app);
+			this.ignoreManager.setEnabled(this.settings.pathExclusionsEnabled);
+			if (this.settings.pathExclusionsEnabled) {
+				await this.ignoreManager.loadIgnoreFile();
+				Debug.log('✅ Path exclusions initialized');
+			} else {
+				Debug.log('✅ Path exclusions disabled');
 			}
 
 			// Initialize vault context tracking
@@ -662,6 +676,141 @@ class MCPSettingTab extends PluginSettingTab {
 					// Refresh display to update examples
 					this.display();
 				}));
+
+		// Path Exclusions Setting
+		new Setting(containerEl)
+			.setName('Path Exclusions')
+			.setDesc('Exclude files and directories from MCP operations using .gitignore-style patterns')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.pathExclusionsEnabled)
+				.onChange(async (value) => {
+					this.plugin.settings.pathExclusionsEnabled = value;
+					await this.plugin.saveSettings();
+					
+					if (this.plugin.ignoreManager) {
+						this.plugin.ignoreManager.setEnabled(value);
+						if (value) {
+							await this.plugin.ignoreManager.loadIgnoreFile();
+							Debug.log('✅ Path exclusions enabled');
+							new Notice('✅ Path exclusions enabled');
+						} else {
+							Debug.log('🔓 Path exclusions disabled');
+							new Notice('🔓 Path exclusions disabled');
+						}
+					}
+					
+					// Refresh display to show/hide file management options
+					this.display();
+				}));
+
+		// Show file management options if path exclusions are enabled
+		if (this.plugin.settings.pathExclusionsEnabled) {
+			this.createPathExclusionManagement(containerEl);
+		}
+	}
+
+	private createPathExclusionManagement(containerEl: HTMLElement): void {
+		const exclusionSection = containerEl.createDiv('mcp-exclusion-section');
+		exclusionSection.createEl('h4', {text: '.mcpignore File Management'});
+
+		if (this.plugin.ignoreManager) {
+			const stats = this.plugin.ignoreManager.getStats();
+			
+			// Status info
+			const statusEl = exclusionSection.createDiv('mcp-exclusion-status');
+			statusEl.createEl('p', {
+				text: `Current exclusions: ${stats.patternCount} patterns active`,
+				cls: 'setting-item-description'
+			});
+			
+			if (stats.lastModified > 0) {
+				statusEl.createEl('p', {
+					text: `Last modified: ${new Date(stats.lastModified).toLocaleString()}`,
+					cls: 'setting-item-description'
+				});
+			}
+
+			// File management buttons
+			const buttonContainer = exclusionSection.createDiv('mcp-exclusion-buttons');
+			
+			// Open .mcpignore button
+			const openButton = buttonContainer.createEl('button', {
+				text: 'Open .mcpignore File',
+				cls: 'mod-cta'
+			});
+			openButton.addEventListener('click', async () => {
+				try {
+					const exists = await this.plugin.ignoreManager!.ignoreFileExists();
+					if (!exists) {
+						await this.plugin.ignoreManager!.createDefaultIgnoreFile();
+					}
+					
+					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
+					if (file) {
+						const leaf = this.app.workspace.getUnpinnedLeaf();
+						await leaf.openFile(file as any);
+						new Notice('📝 .mcpignore file opened for editing');
+					}
+				} catch (error) {
+					console.error('Failed to open .mcpignore file:', error);
+					new Notice('❌ Failed to open .mcpignore file');
+				}
+			});
+
+			// Create template button
+			const templateButton = buttonContainer.createEl('button', {
+				text: 'Create Template'
+			});
+			templateButton.addEventListener('click', async () => {
+				try {
+					await this.plugin.ignoreManager!.createDefaultIgnoreFile();
+					new Notice('📄 Default .mcpignore template created');
+					this.display(); // Refresh to update status
+				} catch (error) {
+					console.error('Failed to create .mcpignore template:', error);
+					new Notice('❌ Failed to create template');
+				}
+			});
+
+			// Reload patterns button
+			const reloadButton = buttonContainer.createEl('button', {
+				text: 'Reload Patterns'
+			});
+			reloadButton.addEventListener('click', async () => {
+				try {
+					await this.plugin.ignoreManager!.forceReload();
+					new Notice('🔄 Exclusion patterns reloaded');
+					this.display(); // Refresh to update status
+				} catch (error) {
+					console.error('Failed to reload patterns:', error);
+					new Notice('❌ Failed to reload patterns');
+				}
+			});
+
+			// Help text
+			const helpEl = exclusionSection.createDiv('mcp-exclusion-help');
+			helpEl.createEl('h5', {text: 'Pattern Examples:'});
+			const examplesList = helpEl.createEl('ul');
+			const examples = [
+				'private/ - exclude entire directory',
+				'*.secret - exclude files by extension',
+				'temp/** - exclude deeply nested paths',
+				'!file.md - include exception (whitelist)',
+				'.obsidian/workspace* - exclude workspace files'
+			];
+			
+			examples.forEach(example => {
+				examplesList.createEl('li', {
+					text: example,
+					cls: 'setting-item-description'
+				});
+			});
+
+			helpEl.createEl('p', {
+				text: 'Full syntax documentation: https://git-scm.com/docs/gitignore',
+				cls: 'setting-item-description'
+			});
+		}
 	}
 
 	private createUIOptionsSection(containerEl: HTMLElement): void {
