@@ -744,12 +744,17 @@ class MCPSettingTab extends PluginSettingTab {
 			openButton.addEventListener('click', async () => {
 				console.log('OPEN BUTTON CLICKED!');  // This should show if button works
 				try {
+					console.log('Inside try block - checking file exists...');
 					const exists = await this.plugin.ignoreManager!.ignoreFileExists();
+					console.log('File exists?', exists);
 					if (!exists) {
 						await this.plugin.ignoreManager!.createDefaultIgnoreFile();
 					}
 					
+					console.log('Getting file from vault, path:', stats.filePath);
+					console.log('this.app available?', !!this.app);
 					const file = this.app.vault.getAbstractFileByPath(stats.filePath);
+					console.log('Got file?', !!file, file);
 					if (file) {
 						try {
 							// Debug logging
@@ -788,7 +793,8 @@ class MCPSettingTab extends PluginSettingTab {
 						}
 					}
 				} catch (error) {
-					console.error('Failed to open .mcpignore file:', error);
+					console.error('OUTER CATCH - Failed to open .mcpignore file:', error);
+					console.error('Error details:', error);
 					new Notice('❌ Failed to open .mcpignore file');
 				}
 			});
