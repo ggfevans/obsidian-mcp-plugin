@@ -218,12 +218,19 @@ export class ObsidianAPI {
       await this.ensureDirectoryExists(dirPath);
     }
 
-    const file = await this.app.vault.create(path, content);
-    return { 
-      success: true, 
-      path: file.path,
-      name: file.name 
-    };
+    const result = await this.withVaultRetry(
+      async () => {
+        const file = await this.app.vault.create(path, content);
+        return { 
+          success: true, 
+          path: file.path,
+          name: file.name 
+        };
+      },
+      'file creation',
+      500 // Base delay for file operations
+    );
+    return result;
   }
 
   async updateFile(path: string, content: string) {
@@ -1037,9 +1044,67 @@ export class ObsidianAPI {
     for (const part of parts) {
       currentPath = currentPath ? `${currentPath}/${part}` : part;
       if (!this.app.vault.getAbstractFileByPath(currentPath)) {
-        await this.app.vault.createFolder(currentPath);
+        await this.createFolderWithRetry(currentPath);
       }
     }
+  }
+
+  private async createFolderWithRetry(folderPath: string): Promise<void> {
+    await this.withVaultRetry(
+      async () => {
+        await this.app.vault.createFolder(folderPath);
+      },
+      'folder creation',
+      300 // Base delay for folder operations
+    );
+  }
+
+  /**
+   * Universal retry mechanism for Vault operations that may conflict with sync processes
+   * Handles iCloud Drive, OneDrive, Dropbox, and other sync service timing issues
+   * 
+   * @param operation - Async function to execute with retry logic
+   * @param operationType - Human-readable description for logging
+   * @param baseDelayMs - Base delay in milliseconds (exponentially increased per retry)
+   * @param maxRetries - Maximum number of retry attempts
+   * @returns Result of the operation
+   */
+  private async withVaultRetry<T>(
+    operation: () => Promise<T>,
+    operationType: string,
+    baseDelayMs: number = 500,
+    maxRetries: number = 3
+  ): Promise<T> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        // Check if this is a sync-related conflict error
+        const isSyncConflictError = error.message && (
+          error.message.includes('already exists') ||
+          error.message.includes('file exists') ||
+          error.message.includes('folder exists') ||
+          error.message.includes('EEXIST') ||
+          error.message.includes('ENOENT') || // File disappeared during sync
+          error.message.includes('EBUSY') ||  // File locked by sync process
+          error.message.includes('EPERM')     // Permission denied during sync
+        );
+
+        if (isSyncConflictError && attempt < maxRetries - 1) {
+          // Exponential backoff: allow time for sync processes to stabilize
+          const delay = Math.pow(2, attempt) * baseDelayMs;
+          console.log(`${operationType} failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms... Error: ${error.message}`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // If it's the final attempt or not a sync-related error, re-throw
+        throw error;
+      }
+    }
+
+    // This should never be reached due to the loop logic, but TypeScript needs it
+    throw new Error(`Failed ${operationType} after ${maxRetries} attempts`);
   }
 
 }
