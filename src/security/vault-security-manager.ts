@@ -122,6 +122,7 @@ export class VaultSecurityManager {
 	 * Validates both permissions and paths
 	 */
 	async validateOperation(operation: VaultOperation): Promise<ValidatedOperation> {
+		Debug.log(`🔐 VaultSecurityManager.validateOperation called for: ${operation.type} on "${operation.path}"`);
 		try {
 			// Step 1: Check if security is enabled
 			if (this.settings.pathValidation === 'disabled') {
@@ -260,6 +261,8 @@ export class VaultSecurityManager {
 	 * Checks if a path is in the blocked list
 	 */
 	private isPathBlocked(path: string): boolean {
+		Debug.log(`🔍 Checking if path is blocked: "${path}"`);
+		
 		// Always block access to .mcpignore file itself for security
 		if (path === '.mcpignore' || path === '/.mcpignore') {
 			Debug.log(`Path blocked - .mcpignore file is protected: ${path}`);
@@ -267,19 +270,29 @@ export class VaultSecurityManager {
 		}
 
 		// Check .mcpignore patterns if available
-		if (this.ignoreManager && this.ignoreManager.getEnabled() && this.ignoreManager.isExcluded(path)) {
-			Debug.log(`Path blocked by .mcpignore: ${path}`);
-			return true;
+		Debug.log(`🔍 .mcpignore check - ignoreManager: ${!!this.ignoreManager}, enabled: ${this.ignoreManager?.getEnabled()}`);
+		if (this.ignoreManager && this.ignoreManager.getEnabled()) {
+			const isExcluded = this.ignoreManager.isExcluded(path);
+			Debug.log(`🔍 .mcpignore exclusion check for "${path}": ${isExcluded}`);
+			if (isExcluded) {
+				Debug.log(`Path blocked by .mcpignore: ${path}`);
+				return true;
+			}
 		}
 
 		// Then check blockedPaths setting
+		Debug.log(`🔍 blockedPaths check - array: ${JSON.stringify(this.settings.blockedPaths)}`);
 		if (!this.settings.blockedPaths || this.settings.blockedPaths.length === 0) {
+			Debug.log(`🔍 No blockedPaths configured, path "${path}" is not blocked`);
 			return false;
 		}
 
-		return this.settings.blockedPaths.some(pattern => 
+		const isBlockedBySettings = this.settings.blockedPaths.some(pattern => 
 			this.matchesPattern(path, pattern)
 		);
+		Debug.log(`🔍 blockedPaths pattern match result for "${path}": ${isBlockedBySettings}`);
+		
+		return isBlockedBySettings;
 	}
 
 	/**
