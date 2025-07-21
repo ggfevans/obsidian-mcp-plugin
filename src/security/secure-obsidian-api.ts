@@ -21,9 +21,11 @@ export class SecureObsidianAPI extends ObsidianAPI {
 		
 		// Initialize security manager with provided or default settings
 		const settings = securitySettings || (plugin?.settings?.security) || {};
-		this.security = new VaultSecurityManager(app, settings);
+		const ignoreManager = plugin?.ignoreManager;
+		this.security = new VaultSecurityManager(app, settings, ignoreManager);
 		
 		Debug.log('🔐 SecureObsidianAPI initialized with security settings:', this.security.getSettings());
+		Debug.log('🔐 SecureObsidianAPI has ignoreManager:', !!ignoreManager);
 	}
 
 	// File Operations - READ

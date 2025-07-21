@@ -1,6 +1,7 @@
 import { App } from 'obsidian';
 import { SecurePathValidator, SecurityError, ValidatedPath } from './path-validator';
 import { Debug } from '../utils/debug';
+import { MCPIgnoreManager } from './mcp-ignore-manager';
 
 /**
  * Operation types matching CRUD + special operations
@@ -107,10 +108,13 @@ export class VaultSecurityManager {
 	private settings: SecuritySettings;
 	private auditLog: SecurityLogEntry[] = [];
 	private readonly maxLogEntries = 1000;
+	private ignoreManager?: MCPIgnoreManager;
 
-	constructor(app: App, settings: Partial<SecuritySettings> = {}) {
+	constructor(app: App, settings: Partial<SecuritySettings> = {}, ignoreManager?: MCPIgnoreManager) {
 		this.validator = new SecurePathValidator(app);
 		this.settings = { ...DEFAULT_SECURITY_SETTINGS, ...settings };
+		this.ignoreManager = ignoreManager;
+		Debug.log(`VaultSecurityManager initialized with ignoreManager: ${!!ignoreManager}`);
 	}
 
 	/**
@@ -256,6 +260,19 @@ export class VaultSecurityManager {
 	 * Checks if a path is in the blocked list
 	 */
 	private isPathBlocked(path: string): boolean {
+		// Always block access to .mcpignore file itself for security
+		if (path === '.mcpignore' || path === '/.mcpignore') {
+			Debug.log(`Path blocked - .mcpignore file is protected: ${path}`);
+			return true;
+		}
+
+		// Check .mcpignore patterns if available
+		if (this.ignoreManager && this.ignoreManager.getEnabled() && this.ignoreManager.isExcluded(path)) {
+			Debug.log(`Path blocked by .mcpignore: ${path}`);
+			return true;
+		}
+
+		// Then check blockedPaths setting
 		if (!this.settings.blockedPaths || this.settings.blockedPaths.length === 0) {
 			return false;
 		}
