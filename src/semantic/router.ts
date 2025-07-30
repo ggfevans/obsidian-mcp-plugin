@@ -861,17 +861,18 @@ export class SemanticRouter {
     const skippedFiles: string[] = [];
     
     const copyDir = async (srcDir: string, destDir: string) => {
-      const files = await this.api.listFiles(srcDir);
+      // Use listFilesPaginated to get both files and directories
+      const response = await this.api.listFilesPaginated(srcDir, 1, 1000); // Get large page to avoid pagination
+      const items = response.files;
       
-      for (const file of files) {
-        // listFiles returns full paths, so extract just the relative part
-        const relativePath = file.startsWith(srcDir + '/') ? file.substring(srcDir.length + 1) : file;
-        const srcPath = file; // Use the full path returned by listFiles
+      for (const item of items) {
+        const srcPath = item.path;
+        const relativePath = srcPath.startsWith(srcDir + '/') ? srcPath.substring(srcDir.length + 1) : item.name;
         const destFilePath = `${destDir}/${relativePath}`;
         
-        if (relativePath.endsWith('/')) {
+        if (item.type === 'folder') {
           // Subdirectory - recurse
-          await copyDir(srcPath.slice(0, -1), destFilePath.slice(0, -1));
+          await copyDir(srcPath, destFilePath);
         } else {
           try {
             // File - copy

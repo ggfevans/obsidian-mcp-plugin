@@ -112,6 +112,74 @@ class MockObsidianAPI extends ObsidianAPI {
       content
     };
   }
+
+  async listFilesPaginated(directory?: string, page: number = 1, pageSize: number = 20): Promise<any> {
+    const targetDir = directory || '';
+    const items: any[] = [];
+    
+    // Add files in this directory (return full paths like the real API) 
+    for (const [path, file] of this.mockFiles) {
+      if (path.startsWith(targetDir)) {
+        const remainingPath = path.substring(targetDir.length);
+        if (remainingPath.startsWith('/')) {
+          const nextSlash = remainingPath.indexOf('/', 1);
+          if (nextSlash === -1) {
+            // File directly in this directory
+            items.push({
+              path: path,
+              name: path.split('/').pop(),
+              type: 'file',
+              size: file.content.length,
+              extension: path.split('.').pop()
+            });
+          }
+        } else if (targetDir === '' && !path.includes('/')) {
+          // Root level file
+          items.push({
+            path: path,
+            name: path,
+            type: 'file',
+            size: file.content.length,
+            extension: path.split('.').pop()
+          });
+        }
+      }
+    }
+    
+    // Add subdirectories
+    for (const dirPath of this.mockDirectories) {
+      if (dirPath.startsWith(targetDir) && dirPath !== targetDir) {
+        const remainingPath = dirPath.substring(targetDir.length);
+        if (remainingPath.startsWith('/')) {
+          const nextSlash = remainingPath.indexOf('/', 1);
+          if (nextSlash === -1) {
+            // Direct subdirectory
+            items.push({
+              path: dirPath,
+              name: dirPath.split('/').pop(),
+              type: 'folder'
+            });
+          }
+        } else if (targetDir === '' && !dirPath.includes('/')) {
+          // Root level directory
+          items.push({
+            path: dirPath,
+            name: dirPath,
+            type: 'folder'
+          });
+        }
+      }
+    }
+    
+    return {
+      files: items.filter(item => item !== null),
+      page,
+      pageSize,
+      totalFiles: items.length,
+      totalPages: Math.ceil(items.length / pageSize),
+      directory
+    };
+  }
 }
 
 describe('Recursive Directory Copy', () => {
