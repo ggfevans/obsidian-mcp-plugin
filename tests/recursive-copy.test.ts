@@ -1,0 +1,252 @@
+import { SemanticRouter } from '../src/semantic/router';
+import { ObsidianAPI } from '../src/utils/obsidian-api';
+import { App } from 'obsidian';
+
+// Mock the ObsidianAPI
+class MockObsidianAPI extends ObsidianAPI {
+  private mockFiles: Map<string, { content: string; isImage?: boolean }> = new Map();
+  private mockDirectories: Set<string> = new Set();
+
+  constructor() {
+    super({} as App);
+  }
+
+  // Setup mock data
+  setupMockFileSystem() {
+    // Mock files
+    this.mockFiles.set('source/file1.md', { content: '# File 1\nContent of file 1' });
+    this.mockFiles.set('source/file2.md', { content: '# File 2\nContent of file 2' });
+    this.mockFiles.set('source/subdir/file3.md', { content: '# File 3\nContent of file 3' });
+    this.mockFiles.set('source/subdir/nested/file4.md', { content: '# File 4\nContent of file 4' });
+    this.mockFiles.set('source/image.png', { content: 'binary', isImage: true });
+    
+    // Mock directories
+    this.mockDirectories.add('source');
+    this.mockDirectories.add('source/subdir');
+    this.mockDirectories.add('source/subdir/nested');
+  }
+
+  async listFiles(directory?: string): Promise<string[]> {
+    const targetDir = directory || '';
+    const files: string[] = [];
+    
+    // Add files in this directory
+    for (const [path, _] of this.mockFiles) {
+      const relativePath = directory ? path.replace(`${directory}/`, '') : path;
+      if (path.startsWith(targetDir) && !relativePath.includes('/')) {
+        files.push(relativePath.split('/').pop() || '');
+      }
+    }
+    
+    // Add subdirectories
+    for (const dirPath of this.mockDirectories) {
+      const relativePath = directory ? dirPath.replace(`${directory}/`, '') : dirPath;
+      if (dirPath.startsWith(targetDir) && dirPath !== targetDir && !relativePath.includes('/')) {
+        files.push(relativePath.split('/').pop() + '/');
+      }
+    }
+    
+    return files.filter(f => f !== '');
+  }
+
+  async getFile(path: string): Promise<any> {
+    const file = this.mockFiles.get(path);
+    if (!file) {
+      throw new Error(`File not found: ${path}`);
+    }
+    
+    if (file.isImage) {
+      return {
+        content: file.content,
+        path,
+        type: 'binary',
+        isImage: true
+      };
+    }
+    
+    return {
+      content: file.content,
+      path,
+      type: 'text'
+    };
+  }
+
+  async createFile(path: string, content: string): Promise<any> {
+    if (this.mockFiles.has(path)) {
+      throw new Error(`File already exists: ${path}`);
+    }
+    
+    this.mockFiles.set(path, { content });
+    return {
+      success: true,
+      path,
+      content
+    };
+  }
+
+  async updateFile(path: string, content: string): Promise<any> {
+    this.mockFiles.set(path, { content });
+    return {
+      success: true,
+      path,
+      content
+    };
+  }
+}
+
+describe('Recursive Directory Copy', () => {
+  let router: SemanticRouter;
+  let mockAPI: MockObsidianAPI;
+
+  beforeEach(() => {
+    mockAPI = new MockObsidianAPI();
+    mockAPI.setupMockFileSystem();
+    router = new SemanticRouter(mockAPI);
+  });
+
+  describe('isDirectory detection', () => {
+    test('should detect directory correctly', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest', recursive: false }
+      });
+
+      // Should fail because source is directory and recursive=false
+      expect(result.error?.message).toContain('Source is a directory');
+    });
+
+    test('should detect file correctly', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source/file1.md', destination: 'dest/file1.md' }
+      });
+
+      expect(result.result.success).toBe(true);
+      expect(result.result.sourcePath).toBe('source/file1.md');
+      expect(result.result.copiedTo).toBe('dest/file1.md');
+    });
+  });
+
+  describe('recursive directory copying', () => {
+    test('should copy directory with all files', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+      });
+
+      expect(result.result.success).toBe(true);
+      expect(result.result.sourcePath).toBe('source');
+      expect(result.result.destinationPath).toBe('dest');
+      expect(result.result.filesCount).toBe(4); // file1.md, file2.md, file3.md, file4.md
+      expect(result.result.skippedFiles).toContain('source/image.png'); // Image should be skipped
+    });
+
+    test('should copy nested directory structure', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+      });
+
+      const copiedFiles = result.result.copiedFiles;
+      expect(copiedFiles).toContain('dest/file1.md');
+      expect(copiedFiles).toContain('dest/file2.md');
+      expect(copiedFiles).toContain('dest/subdir/file3.md');
+      expect(copiedFiles).toContain('dest/subdir/nested/file4.md');
+    });
+
+    test('should handle overwrite flag', async () => {
+      // First copy
+      await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+      });
+
+      // Second copy without overwrite should fail
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest', overwrite: false }
+      });
+
+      expect(result.error?.message).toContain('Destination exists');
+    });
+
+    test('should overwrite when overwrite=true', async () => {
+      // First copy
+      await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+      });
+
+      // Second copy with overwrite should succeed
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest', overwrite: true }
+      });
+
+      expect(result.result.success).toBe(true);
+      expect(result.result.filesCount).toBe(4);
+    });
+
+    test('should skip image files but continue copying', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+      });
+
+      expect(result.result.success).toBe(true);
+      expect(result.result.skippedFiles).toEqual(['source/image.png']);
+      expect(result.result.filesCount).toBe(4); // Only text files copied
+    });
+
+    test('should provide helpful workflow suggestions', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+      });
+
+      expect(result.result.workflow.message).toContain('Directory copied successfully');
+      expect(result.result.workflow.suggested_next).toHaveLength(3); // List, view, review skipped
+      
+      const suggestions = result.result.workflow.suggested_next;
+      expect(suggestions[0].description).toBe('List copied directory contents');
+      expect(suggestions[0].command).toContain('vault(action=\'list\', directory=\'dest\')');
+      expect(suggestions[2].description).toBe('Review skipped files');
+    });
+  });
+
+  describe('backward compatibility', () => {
+    test('should maintain existing file copy behavior', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source/file1.md', destination: 'copied-file.md' }
+      });
+
+      expect(result.result.success).toBe(true);
+      expect(result.result.sourcePath).toBe('source/file1.md');
+      expect(result.result.copiedTo).toBe('copied-file.md');
+    });
+
+    test('should default recursive=true for backward compatibility', async () => {
+      const result = await router.route({
+        operation: 'vault',
+        action: 'copy',
+        params: { path: 'source', destination: 'dest' }
+        // No recursive parameter - should default to true
+      });
+
+      expect(result.result.success).toBe(true);
+      expect(result.result.filesCount).toBe(4);
+    });
+  });
+});

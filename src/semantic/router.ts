@@ -367,60 +367,22 @@ export class SemanticRouter {
           throw new Error('Both path and destination are required for copy operation');
         }
         
-        // Check if source file exists
-        const sourceFile = await this.api.getFile(path);
-        if (!sourceFile) {
-          throw new Error(`Source file not found: ${path}`);
-        }
-        
-        // Check if destination already exists
+        // First try as a file (this will go through security validation)
         try {
-          const destFile = await this.api.getFile(destination);
-          if (destFile && !overwrite) {
-            throw new Error(`Destination already exists: ${destination}. Set overwrite=true to replace.`);
+          const sourceFile = await this.api.getFile(path);
+          return await this.copyFile(path, destination, overwrite, sourceFile);
+        } catch (fileError: any) {
+          // If file operation failed, try as directory (this will also go through security validation)
+          try {
+            // Test if it's a directory by trying to list its contents
+            await this.api.listFiles(path);
+            // If listing succeeds, it's a directory
+            return await this.copyDirectoryRecursive(path, destination, overwrite);
+          } catch (dirError: any) {
+            // Neither file nor directory worked
+            throw new Error(`Source not found or inaccessible: ${path}`);
           }
-        } catch (e) {
-          // File doesn't exist, which is what we want
         }
-        
-        // Read source content
-        const sourceFileData = await this.api.getFile(path);
-        if (isImageFile(sourceFileData)) {
-          throw new Error('Cannot copy image files - use Obsidian file explorer');
-        }
-        const content = sourceFileData.content;
-        
-        // Directory creation is handled automatically by createFile
-        
-        // Create the copy
-        if (overwrite) {
-          await this.api.updateFile(destination, content);
-        } else {
-          await this.api.createFile(destination, content);
-        }
-        
-        return { 
-          success: true,
-          sourcePath: path,
-          copiedTo: destination,
-          workflow: {
-            message: `File copied successfully from ${path} to ${destination}`,
-            suggested_next: [
-              {
-                description: 'View the copied file',
-                command: `view(action='file', path='${destination}')`
-              },
-              {
-                description: 'Edit the copied file',
-                command: `edit(action='window', path='${destination}', oldText='...', newText='...')`
-              },
-              {
-                description: 'Compare original and copy',
-                command: `view(action='file', path='${path}') then view(action='file', path='${destination}')`
-              }
-            ]
-          }
-        };
       }
       
       case 'split': {
@@ -800,6 +762,185 @@ export class SemanticRouter {
     });
   }
   
+  /**
+   * Copy a single file
+   */
+  private async copyFile(path: string, destination: string, overwrite: boolean, sourceFile: any): Promise<any> {
+    // Check if destination already exists
+    try {
+      const destFile = await this.api.getFile(destination);
+      if (destFile && !overwrite) {
+        throw new Error(`Destination already exists: ${destination}. Set overwrite=true to replace.`);
+      }
+    } catch (e: any) {
+      // File doesn't exist, which is what we want
+    }
+    
+    // Check for image files
+    if (isImageFile(sourceFile)) {
+      throw new Error('Cannot copy image files - use Obsidian file explorer');
+    }
+    
+    const content = sourceFile.content;
+    
+    // Create the copy
+    if (overwrite) {
+      await this.api.updateFile(destination, content);
+    } else {
+      await this.api.createFile(destination, content);
+    }
+    
+    return { 
+      success: true,
+      sourcePath: path,
+      copiedTo: destination,
+      workflow: {
+        message: `File copied successfully from ${path} to ${destination}`,
+        suggested_next: [
+          {
+            description: 'View the copied file',
+            command: `view(action='file', path='${destination}')`
+          },
+          {
+            description: 'Edit the copied file',
+            command: `edit(action='window', path='${destination}', oldText='...', newText='...')`
+          },
+          {
+            description: 'Compare original and copy',
+            command: `view(action='file', path='${path}') then view(action='file', path='${destination}')`
+          }
+        ]
+      }
+    };
+  }
+
+  /**
+   * Check if a path is a directory using the paginated listing API that properly identifies folders
+   */
+  private async isDirectory(path: string): Promise<boolean> {
+    try {
+      // Method 1: Use Obsidian's vault API to check if path is a folder
+      if (this.app) {
+        const abstractFile = this.app.vault.getAbstractFileByPath(path);
+        if (abstractFile && 'children' in abstractFile) {
+          return true; // TFolder has children property
+        }
+      }
+      
+      // Method 2: Use paginated listing to check if this path exists as a folder
+      try {
+        const parentPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.';
+        const dirName = path.includes('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+        
+        // Use paginated listing to get detailed file information including type
+        const result = await this.api.listFilesPaginated(parentPath === '.' ? undefined : parentPath, 1, 100);
+        
+        // Check if any item matches our directory name and has type 'folder'
+        return result.files.some(file => 
+          file.name === dirName && file.type === 'folder'
+        );
+      } catch {
+        // Fallback method: try to list the path directly as a directory
+        try {
+          await this.api.listFiles(path);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Recursively copy a directory and all its contents
+   */
+  private async copyDirectoryRecursive(sourcePath: string, destPath: string, overwrite: boolean): Promise<any> {
+    const copiedFiles: string[] = [];
+    const skippedFiles: string[] = [];
+    
+    const copyDir = async (srcDir: string, destDir: string) => {
+      const files = await this.api.listFiles(srcDir);
+      
+      for (const file of files) {
+        const srcPath = `${srcDir}/${file}`;
+        const destFilePath = `${destDir}/${file}`;
+        
+        if (file.endsWith('/')) {
+          // Subdirectory - recurse
+          await copyDir(srcPath.slice(0, -1), destFilePath.slice(0, -1));
+        } else {
+          try {
+            // File - copy
+            const sourceFile = await this.api.getFile(srcPath);
+            if (isImageFile(sourceFile)) {
+              console.warn(`Skipping image file: ${srcPath}`);
+              skippedFiles.push(srcPath);
+              continue;
+            }
+            
+            // Check destination exists if not overwriting
+            if (!overwrite) {
+              try {
+                await this.api.getFile(destFilePath);
+                throw new Error(`Destination exists: ${destFilePath}. Set overwrite=true to replace.`);
+              } catch (e: any) {
+                // File doesn't exist - good to proceed
+                if (!e.message?.includes('Destination exists')) {
+                  // Some other error occurred, but continue
+                }
+              }
+            }
+            
+            const content = sourceFile.content;
+            if (overwrite) {
+              await this.api.updateFile(destFilePath, content);
+            } else {
+              await this.api.createFile(destFilePath, content);
+            }
+            copiedFiles.push(destFilePath);
+          } catch (error: any) {
+            if (error.message?.includes('Destination exists')) {
+              throw error; // Re-throw destination exists errors
+            }
+            // Log other errors but continue
+            console.warn(`Failed to copy ${srcPath}: ${error.message}`);
+            skippedFiles.push(srcPath);
+          }
+        }
+      }
+    };
+    
+    await copyDir(sourcePath, destPath);
+    
+    return {
+      success: true,
+      sourcePath,
+      destinationPath: destPath,
+      filesCount: copiedFiles.length,
+      copiedFiles,
+      skippedFiles,
+      workflow: {
+        message: `Directory copied successfully: ${copiedFiles.length} files from ${sourcePath} to ${destPath}${skippedFiles.length > 0 ? ` (${skippedFiles.length} files skipped)` : ''}`,
+        suggested_next: [
+          {
+            description: 'List copied directory contents',
+            command: `vault(action='list', directory='${destPath}')`
+          },
+          {
+            description: 'View a copied file',
+            command: `view(action='file', path='${copiedFiles[0] || destPath + '/README.md'}')`
+          },
+          ...(skippedFiles.length > 0 ? [{
+            description: 'Review skipped files',
+            command: `Review skipped files: ${skippedFiles.slice(0, 3).join(', ')}${skippedFiles.length > 3 ? '...' : ''}`
+          }] : [])
+        ]
+      }
+    };
+  }
+
   private getFileType(filename: string): string {
     const ext = filename.toLowerCase().split('.').pop() || '';
     
