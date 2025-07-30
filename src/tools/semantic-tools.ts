@@ -270,7 +270,7 @@ function getOperationDescription(operation: string): string {
     workflow: '💡 Get contextual suggestions for next actions based on current state',
     system: 'ℹ️ System operations - info: server details, commands: available actions, fetch_web: retrieve and process web content',
     graph: '🕸️ Graph navigation - traverse: explore connections, neighbors: immediate links, path: find routes between notes, statistics: link counts, backlinks/forwardlinks: directional analysis, search-traverse: connected snippets',
-    dataview: '📊 Dataview operations - query: execute DQL queries, list: get pages with metadata, metadata: get page metadata, validate: check query syntax, status: check plugin status'
+    dataview: '📊 Dataview operations - query: execute DQL queries (LIST FROM "folder", TABLE field FROM #tag WHERE condition), list: get pages with metadata and frontmatter, metadata: extract complete page metadata, validate: check DQL syntax, status: plugin availability. Supports LIST, TABLE, TASK, CALENDAR queries with WHERE filters, sorting, grouping.'
   };
   return descriptions[operation] || 'Unknown operation';
 }
@@ -585,7 +585,7 @@ function getParametersForOperation(operation: string): Record<string, any> {
     dataview: {
       query: {
         type: 'string',
-        description: 'DQL query string (e.g., "LIST FROM #tag WHERE rating > 3")'
+        description: 'DQL query string. Examples: "LIST FROM #project WHERE status = \\"active\\"", "TABLE file.size, rating FROM \\"Notes\\" WHERE rating > 3 SORT file.mtime DESC", "TASK FROM #todo WHERE !completed", "CALENDAR file.ctime FROM \\"Daily Notes\\""'
       },
       format: {
         type: 'string',
@@ -595,7 +595,7 @@ function getParametersForOperation(operation: string): Record<string, any> {
       },
       source: {
         type: 'string',
-        description: 'Source filter for pages (folder path, tag, or link)'
+        description: 'Source filter for pages. Examples: "folder/path" (folder), "#tag" (tag), "[[Note Name]]" (backlinks), "" (all pages)'
       },
       ...pathParam
     }

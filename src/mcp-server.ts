@@ -19,6 +19,7 @@ import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
 import { SecureObsidianAPI, VaultSecurityManager } from './security';
 import { semanticTools, createSemanticTools } from './tools/semantic-tools';
+import { DataviewTool, isDataviewToolAvailable } from './tools/dataview-tool';
 import { Debug } from './utils/debug';
 import { ConnectionPool, PooledRequest } from './utils/connection-pool';
 import { SessionManager } from './utils/session-manager';
@@ -223,6 +224,16 @@ export class MCPHttpServer {
           mimeType: 'application/json'
         }
       ];
+
+      // Add Dataview reference resource if plugin is available
+      if (isDataviewToolAvailable(this.obsidianAPI)) {
+        resources.push({
+          uri: 'obsidian://dataview-reference',
+          name: 'Dataview Query Language Reference',
+          description: 'Complete DQL syntax guide with examples, functions, and best practices',
+          mimeType: 'text/markdown'
+        });
+      }
       
       return { resources };
     });
@@ -266,6 +277,20 @@ export class MCPHttpServer {
             uri,
             mimeType: 'application/json',
             text: JSON.stringify(vaultInfo, null, 2)
+          }]
+        };
+      }
+
+      if (uri === 'obsidian://dataview-reference') {
+        if (!isDataviewToolAvailable(this.obsidianAPI)) {
+          throw new Error('Dataview plugin is not available');
+        }
+
+        return {
+          contents: [{
+            uri,
+            mimeType: 'text/markdown',
+            text: DataviewTool.generateDataviewReference()
           }]
         };
       }
