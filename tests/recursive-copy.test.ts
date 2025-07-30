@@ -30,19 +30,37 @@ class MockObsidianAPI extends ObsidianAPI {
     const targetDir = directory || '';
     const files: string[] = [];
     
-    // Add files in this directory
+    // Add files in this directory (return full paths like the real API)
     for (const [path, _] of this.mockFiles) {
-      const relativePath = directory ? path.replace(`${directory}/`, '') : path;
-      if (path.startsWith(targetDir) && !relativePath.includes('/')) {
-        files.push(relativePath.split('/').pop() || '');
+      if (path.startsWith(targetDir)) {
+        const remainingPath = path.substring(targetDir.length);
+        if (remainingPath.startsWith('/')) {
+          const nextSlash = remainingPath.indexOf('/', 1);
+          if (nextSlash === -1) {
+            // File directly in this directory
+            files.push(path);
+          }
+        } else if (targetDir === '' && !path.includes('/')) {
+          // Root level file
+          files.push(path);
+        }
       }
     }
     
-    // Add subdirectories
+    // Add subdirectories (return full paths with trailing slash)
     for (const dirPath of this.mockDirectories) {
-      const relativePath = directory ? dirPath.replace(`${directory}/`, '') : dirPath;
-      if (dirPath.startsWith(targetDir) && dirPath !== targetDir && !relativePath.includes('/')) {
-        files.push(relativePath.split('/').pop() + '/');
+      if (dirPath.startsWith(targetDir) && dirPath !== targetDir) {
+        const remainingPath = dirPath.substring(targetDir.length);
+        if (remainingPath.startsWith('/')) {
+          const nextSlash = remainingPath.indexOf('/', 1);
+          if (nextSlash === -1) {
+            // Direct subdirectory
+            files.push(dirPath + '/');
+          }
+        } else if (targetDir === '' && !dirPath.includes('/')) {
+          // Root level directory
+          files.push(dirPath + '/');
+        }
       }
     }
     

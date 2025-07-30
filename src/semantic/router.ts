@@ -864,10 +864,12 @@ export class SemanticRouter {
       const files = await this.api.listFiles(srcDir);
       
       for (const file of files) {
-        const srcPath = `${srcDir}/${file}`;
-        const destFilePath = `${destDir}/${file}`;
+        // listFiles returns full paths, so extract just the relative part
+        const relativePath = file.startsWith(srcDir + '/') ? file.substring(srcDir.length + 1) : file;
+        const srcPath = file; // Use the full path returned by listFiles
+        const destFilePath = `${destDir}/${relativePath}`;
         
-        if (file.endsWith('/')) {
+        if (relativePath.endsWith('/')) {
           // Subdirectory - recurse
           await copyDir(srcPath.slice(0, -1), destFilePath.slice(0, -1));
         } else {
