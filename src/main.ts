@@ -4,6 +4,8 @@ import { getVersion } from './version';
 import { Debug } from './utils/debug';
 import { MCPIgnoreManager } from './security/mcp-ignore-manager';
 import { randomBytes } from 'crypto';
+import { createSemanticTools } from './tools/semantic-tools';
+import { PluginDetector } from './utils/plugin-detector';
 
 interface MCPPluginSettings {
 	httpEnabled: boolean;
@@ -1047,7 +1049,8 @@ class MCPSettingTab extends PluginSettingTab {
 			warningEl.style.fontWeight = 'bold';
 		}
 		
-		const toolsList = [
+		// Dynamic tools list based on plugin availability
+		const baseToolsList = [
 			'🗂️ vault - File and folder operations with fragment support',
 			'✏️ edit - Smart editing with content buffers', 
 			'👁️ view - Content viewing and navigation',
@@ -1056,11 +1059,41 @@ class MCPSettingTab extends PluginSettingTab {
 			'⚙️ system - System operations and web fetch'
 		];
 		
-		info.createEl('h4', {text: 'Available Tools (6)'});
+		// Check for optional plugin integrations
+		const detector = new PluginDetector(this.app);
+		const isDataviewAvailable = detector.isDataviewAPIReady();
+		
+		const toolsList = [...baseToolsList];
+		if (isDataviewAvailable) {
+			toolsList.push('📊 dataview - Query vault data with DQL (Dataview plugin detected)');
+		}
+		
+		const toolCount = toolsList.length;
+		info.createEl('h4', {text: `Available Tools (${toolCount})`});
 		const toolsListEl = info.createEl('ul');
 		toolsList.forEach(tool => {
 			toolsListEl.createEl('li', {text: tool});
 		});
+		
+		// Add plugin integration status
+		if (isDataviewAvailable) {
+			const dataviewStatus = detector.getDataviewStatus();
+			const statusEl = info.createEl('p', {
+				text: `🔌 Plugin Integrations: Dataview v${dataviewStatus.version} (enabled)`,
+				cls: 'plugin-integration-status'
+			});
+			statusEl.style.color = 'var(--text-success)';
+			statusEl.style.fontSize = '0.9em';
+			statusEl.style.marginTop = '10px';
+		} else {
+			const statusEl = info.createEl('p', {
+				text: '🔌 Plugin Integrations: None detected (install Dataview for additional functionality)',
+				cls: 'plugin-integration-status'
+			});
+			statusEl.style.color = 'var(--text-muted)';
+			statusEl.style.fontSize = '0.9em';
+			statusEl.style.marginTop = '10px';
+		}
 		
 		const resourceCount = this.plugin.settings.enableConcurrentSessions ? 2 : 1;
 		info.createEl('h4', {text: `Available Resources (${resourceCount})`});

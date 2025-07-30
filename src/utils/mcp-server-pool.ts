@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import { Debug } from './debug';
 import { ObsidianAPI } from './obsidian-api';
 import { SecureObsidianAPI } from '../security/secure-obsidian-api';
-import { semanticTools } from '../tools/semantic-tools';
+import { semanticTools, createSemanticTools } from '../tools/semantic-tools';
 import { getVersion } from '../version';
 import {
   ListToolsRequestSchema,
@@ -119,8 +119,9 @@ export class MCPServerPool extends EventEmitter {
 
     // Register tools handler
     server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const availableTools = createSemanticTools(this.obsidianAPI);
       return {
-        tools: semanticTools.map(tool => ({
+        tools: availableTools.map(tool => ({
           name: tool.name,
           description: tool.description,
           inputSchema: tool.inputSchema
@@ -132,7 +133,8 @@ export class MCPServerPool extends EventEmitter {
     server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
       const { name, arguments: args } = request.params;
       
-      const tool = semanticTools.find(t => t.name === name);
+      const availableTools = createSemanticTools(this.obsidianAPI);
+      const tool = availableTools.find(t => t.name === name);
       if (!tool) {
         throw new Error(`Tool not found: ${name}`);
       }

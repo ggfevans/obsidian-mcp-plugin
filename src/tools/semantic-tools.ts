@@ -4,6 +4,7 @@ import { SemanticRequest } from '../types/semantic';
 import { isImageFile } from '../utils/image-handler';
 import { isImageFile as isImageFileObject } from '../types/obsidian';
 import { App } from 'obsidian';
+import { DataviewTool, isDataviewToolAvailable } from './dataview-tool';
 
 /**
  * Unified semantic tools that consolidate all operations into 5 main verbs
@@ -51,6 +52,103 @@ const createSemanticTool = (operation: string) => ({
       }
     }
     
+    // Handle Dataview operations separately
+    if (operation === 'dataview') {
+      const dataviewTool = new DataviewTool(api);
+      let result;
+
+      switch (args.action) {
+        case 'status':
+          result = {
+            result: dataviewTool.getStatus(),
+            context: { operation, action: args.action }
+          };
+          break;
+        case 'query': {
+          if (!args.query) {
+            result = {
+              error: { code: 'MISSING_PARAMETER', message: 'Query parameter is required' },
+              context: { operation, action: args.action }
+            };
+          } else {
+            const queryResult = await dataviewTool.executeQuery(args.query, args.format);
+            result = {
+              result: queryResult,
+              context: { operation, action: args.action, query: args.query }
+            };
+          }
+          break;
+        }
+        case 'list': {
+          const listResult = await dataviewTool.listPages(args.source);
+          result = {
+            result: listResult,
+            context: { operation, action: args.action, source: args.source }
+          };
+          break;
+        }
+        case 'metadata': {
+          if (!args.path) {
+            result = {
+              error: { code: 'MISSING_PARAMETER', message: 'Path parameter is required' },
+              context: { operation, action: args.action }
+            };
+          } else {
+            const metadataResult = await dataviewTool.getPageMetadata(args.path);
+            result = {
+              result: metadataResult,
+              context: { operation, action: args.action, path: args.path }
+            };
+          }
+          break;
+        }
+        case 'validate': {
+          if (!args.query) {
+            result = {
+              error: { code: 'MISSING_PARAMETER', message: 'Query parameter is required' },
+              context: { operation, action: args.action }
+            };
+          } else {
+            const validateResult = await dataviewTool.validateQuery(args.query);
+            result = {
+              result: validateResult,
+              context: { operation, action: args.action, query: args.query }
+            };
+          }
+          break;
+        }
+        default:
+          result = {
+            error: { code: 'INVALID_ACTION', message: `Unknown Dataview action: ${args.action}` },
+            context: { operation, action: args.action }
+          };
+      }
+
+      // Format Dataview response for MCP
+      if (result.error) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: result.error,
+              context: result.context
+            }, null, 2)
+          }],
+          isError: true
+        };
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            result: result.result,
+            context: result.context
+          }, null, 2)
+        }]
+      };
+    }
+
     const router = new SemanticRouter(api, app);
     
     const request: SemanticRequest = {
@@ -171,7 +269,8 @@ function getOperationDescription(operation: string): string {
     view: '👁️ View content - file: entire document, window: ~20 lines around point, active: current editor file, open_in_obsidian: launch in app',
     workflow: '💡 Get contextual suggestions for next actions based on current state',
     system: 'ℹ️ System operations - info: server details, commands: available actions, fetch_web: retrieve and process web content',
-    graph: '🕸️ Graph navigation - traverse: explore connections, neighbors: immediate links, path: find routes between notes, statistics: link counts, backlinks/forwardlinks: directional analysis, search-traverse: connected snippets'
+    graph: '🕸️ Graph navigation - traverse: explore connections, neighbors: immediate links, path: find routes between notes, statistics: link counts, backlinks/forwardlinks: directional analysis, search-traverse: connected snippets',
+    dataview: '📊 Dataview operations - query: execute DQL queries, list: get pages with metadata, metadata: get page metadata, validate: check query syntax, status: check plugin status'
   };
   return descriptions[operation] || 'Unknown operation';
 }
@@ -183,7 +282,8 @@ function getActionsForOperation(operation: string): string[] {
     view: ['file', 'window', 'active', 'open_in_obsidian'],
     workflow: ['suggest'],
     system: ['info', 'commands', 'fetch_web'],
-    graph: ['traverse', 'neighbors', 'path', 'statistics', 'backlinks', 'forwardlinks', 'search-traverse', 'advanced-traverse', 'tag-traverse', 'tag-analysis', 'shared-tags']
+    graph: ['traverse', 'neighbors', 'path', 'statistics', 'backlinks', 'forwardlinks', 'search-traverse', 'advanced-traverse', 'tag-traverse', 'tag-analysis', 'shared-tags'],
+    dataview: ['query', 'list', 'metadata', 'validate', 'status']
   };
   return actions[operation] || [];
 }
@@ -481,13 +581,51 @@ function getParametersForOperation(operation: string): Record<string, any> {
         type: 'number',
         description: 'Weight factor for tag connections (0-1, default: 0.8)'
       }
+    },
+    dataview: {
+      query: {
+        type: 'string',
+        description: 'DQL query string (e.g., "LIST FROM #tag WHERE rating > 3")'
+      },
+      format: {
+        type: 'string',
+        enum: ['dql'],
+        description: 'Query format (currently only DQL supported)',
+        default: 'dql'
+      },
+      source: {
+        type: 'string',
+        description: 'Source filter for pages (folder path, tag, or link)'
+      },
+      ...pathParam
     }
   };
   
   return operationParams[operation] || {};
 }
 
-// Export the 6 semantic tools
+/**
+ * Create semantic tools array with optional Dataview support
+ */
+export function createSemanticTools(api?: ObsidianAPI): any[] {
+  const baseTools = [
+    createSemanticTool('vault'),
+    createSemanticTool('edit'),
+    createSemanticTool('view'),
+    createSemanticTool('workflow'),
+    createSemanticTool('system'),
+    createSemanticTool('graph')
+  ];
+
+  // Add Dataview tool if available
+  if (api && isDataviewToolAvailable(api)) {
+    baseTools.push(createSemanticTool('dataview'));
+  }
+
+  return baseTools;
+}
+
+// Export the base 6 semantic tools (for backward compatibility)
 export const semanticTools = [
   createSemanticTool('vault'),
   createSemanticTool('edit'),

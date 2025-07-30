@@ -18,7 +18,7 @@ import * as path from 'path';
 import { getVersion } from './version';
 import { ObsidianAPI } from './utils/obsidian-api';
 import { SecureObsidianAPI, VaultSecurityManager } from './security';
-import { semanticTools } from './tools/semantic-tools';
+import { semanticTools, createSemanticTools } from './tools/semantic-tools';
 import { Debug } from './utils/debug';
 import { ConnectionPool, PooledRequest } from './utils/connection-pool';
 import { SessionManager } from './utils/session-manager';
@@ -187,9 +187,11 @@ export class MCPHttpServer {
     if (!this.mcpServer) return;
     
     // Register semantic tools following the proven pattern from obsidian-semantic-mcp
+    // Use dynamic tool creation to include Dataview if available
     this.mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
+      const availableTools = createSemanticTools(this.obsidianAPI);
       return {
-        tools: semanticTools.map(tool => ({
+        tools: availableTools.map(tool => ({
           name: tool.name,
           description: tool.description,
           inputSchema: tool.inputSchema
@@ -201,7 +203,8 @@ export class MCPHttpServer {
     this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request, context): Promise<CallToolResult> => {
       const { name, arguments: args } = request.params;
       
-      const tool = semanticTools.find(t => t.name === name);
+      const availableTools = createSemanticTools(this.obsidianAPI);
+      const tool = availableTools.find(t => t.name === name);
       if (!tool) {
         throw new Error(`Tool not found: ${name}`);
       }
