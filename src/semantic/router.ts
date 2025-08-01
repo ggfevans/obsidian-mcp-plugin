@@ -1390,6 +1390,23 @@ export class SemanticRouter {
       }
     }
     
+    // Add enhanced semantic hints for search and other operations to encourage graph exploration
+    if (!isError) {
+      const enhancedHints = this.generateEnhancedSemanticHints(operation, action, params, result);
+      if (enhancedHints && enhancedHints.suggested_next.length > 0) {
+        if (response.workflow) {
+          // Merge with existing workflow hints
+          response.workflow.suggested_next = [
+            ...response.workflow.suggested_next,
+            ...enhancedHints.suggested_next
+          ];
+          response.workflow.message += ' ' + enhancedHints.message;
+        } else {
+          response.workflow = enhancedHints;
+        }
+      }
+    }
+    
     // Add efficiency hints
     const efficiencyHints = this.checkEfficiencyRules(operation, action, params);
     if (efficiencyHints.length > 0) {
@@ -1627,5 +1644,163 @@ export class SemanticRouter {
       current_context: this.getCurrentContext(),
       suggestions
     };
+  }
+
+  /**
+   * Generate enhanced semantic hints that encourage graph exploration over simple search
+   */
+  private generateEnhancedSemanticHints(operation: string, action: string, params: any, result: any): { message: string; suggested_next: SuggestedAction[] } | null {
+    const suggestions: SuggestedAction[] = [];
+    let message = '';
+
+    // Enhanced hints for search operations
+    if (operation === 'vault' && action === 'search') {
+      if (result?.results && Array.isArray(result.results) && result.results.length > 0) {
+        message = 'Consider exploring connections between these files using graph operations.';
+        
+        // Get first few results for graph exploration suggestions
+        const firstResult = result.results[0];
+        const hasMultipleResults = result.results.length > 1;
+        
+        if (firstResult?.path) {
+          suggestions.push({
+            description: 'Explore connections from first result',
+            command: `graph(action='traverse', sourcePath='${firstResult.path}', maxDepth=2)`,
+            reason: 'Discover related files through links and references'
+          });
+          
+          suggestions.push({
+            description: 'Find files linking to this result',
+            command: `graph(action='backlinks', sourcePath='${firstResult.path}')`,
+            reason: 'See what files reference this content'
+          });
+          
+          suggestions.push({
+            description: 'Find files linked from this result',
+            command: `graph(action='forwardlinks', sourcePath='${firstResult.path}')`,
+            reason: 'See what this file references'
+          });
+        }
+        
+        if (hasMultipleResults) {
+          const secondResult = result.results[1];
+          if (secondResult?.path && firstResult?.path) {
+            suggestions.push({
+              description: 'Find connection path between top results',
+              command: `graph(action='path', sourcePath='${firstResult.path}', targetPath='${secondResult.path}')`,
+              reason: 'Discover how these search results are connected'
+            });
+          }
+        }
+        
+        // Tag-based exploration if we detect potential tag-related content
+        if (params.query && params.query.includes('#')) {
+          const tagQuery = params.query.replace('#', '');
+          suggestions.push({
+            description: 'Explore files with similar tags',
+            command: `graph(action='tag-analysis', tagFilter=['${tagQuery}'])`,
+            reason: 'Find files grouped by similar tags'
+          });
+        }
+      }
+    }
+    
+    // Enhanced hints for read operations - suggest exploring connections
+    if (operation === 'vault' && action === 'read') {
+      if (params.path && !result?.error) {
+        message = 'Explore connections and references for deeper context.';
+        
+        suggestions.push({
+          description: 'Explore graph connections from this file',
+          command: `graph(action='neighbors', sourcePath='${params.path}')`,
+          reason: 'Find directly connected files'
+        });
+        
+        suggestions.push({
+          description: 'Find files that reference this one',
+          command: `graph(action='backlinks', sourcePath='${params.path}')`,
+          reason: 'See where this file is mentioned or linked'
+        });
+        
+        // Check if the content suggests it might have many connections
+        const content = typeof result === 'string' ? result : result?.content || '';
+        const linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
+        const tagCount = (content.match(/#\w+/g) || []).length;
+        
+        if (linkCount > 2) {
+          suggestions.push({
+            description: 'Traverse the link network from this file',
+            command: `graph(action='traverse', sourcePath='${params.path}', maxDepth=3)`,
+            reason: `This file has ${linkCount} links - explore the broader network`
+          });
+        }
+        
+        if (tagCount > 0) {
+          suggestions.push({
+            description: 'Find files with similar tags',
+            command: `graph(action='tag-traverse', startPath='${params.path}', maxDepth=2)`,
+            reason: `This file has ${tagCount} tags - explore related content`
+          });
+        }
+      }
+    }
+    
+    // Enhanced hints for list operations - suggest exploring discovered files
+    if (operation === 'vault' && action === 'list') {
+      if (result && Array.isArray(result) && result.length > 1) {
+        message = 'Consider exploring relationships between these files.';
+        
+        const mdFiles = result.filter(f => typeof f === 'string' && f.endsWith('.md'));
+        if (mdFiles.length >= 2) {
+          suggestions.push({
+            description: 'Find connections between files in this directory',
+            command: `graph(action='path', sourcePath='${mdFiles[0]}', targetPath='${mdFiles[1]}')`,
+            reason: 'Discover how files in this directory relate to each other'
+          });
+          
+          suggestions.push({
+            description: 'Analyze tag relationships in this directory',
+            command: `graph(action='tag-analysis', folderFilter='${params.directory || '/'}')`,
+            reason: 'Find common themes and tags among these files'
+          });
+        }
+      } else if (result && typeof result === 'object' && result.files && Array.isArray(result.files)) {
+        // Handle paginated results
+        const mdFiles = result.files.filter((f: any) => f.name && f.name.endsWith('.md'));
+        if (mdFiles.length >= 2) {
+          message = 'Consider exploring relationships between these files.';
+          
+          suggestions.push({
+            description: 'Find connections between files in this directory',
+            command: `graph(action='path', sourcePath='${mdFiles[0].path}', targetPath='${mdFiles[1].path}')`,
+            reason: 'Discover how files in this directory relate to each other'
+          });
+        }
+      }
+    }
+    
+    // Enhanced hints for fragments operation - suggest broader exploration
+    if (operation === 'vault' && action === 'fragments') {
+      if (result?.fragments && result.fragments.length > 0) {
+        message = 'Explore connections between documents containing these fragments.';
+        
+        const sourcePaths = [...new Set(result.fragments.map((f: any) => f.source).filter(Boolean))];
+        if (sourcePaths.length >= 2) {
+          suggestions.push({
+            description: 'Find connections between fragment sources',
+            command: `graph(action='path', sourcePath='${sourcePaths[0]}', targetPath='${sourcePaths[1]}')`,
+            reason: 'Explore how documents with similar content are connected'
+          });
+          
+          suggestions.push({
+            description: 'Traverse network from first fragment source',
+            command: `graph(action='traverse', sourcePath='${sourcePaths[0]}', maxDepth=2)`,
+            reason: 'Discover the broader context around this content'
+          });
+        }
+      }
+    }
+    
+    return suggestions.length > 0 ? { message, suggested_next: suggestions } : null;
   }
 }
