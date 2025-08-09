@@ -79,27 +79,8 @@ describe('vault:read content.match fix', () => {
         }
       };
 
-      const content = typeof mockResult === 'string' ? mockResult : mockResult?.content || '';
-      
-      let linkCount = 0;
-      let tagCount = 0;
-      
       // This should work fine (original working case)
-      expect(() => {
-        if (typeof content === 'string') {
-          linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
-          tagCount = (content.match(/#\w+/g) || []).length;
-        } else if (Array.isArray(content)) {
-          content.forEach((fragment: any) => {
-            const fragmentText = typeof fragment === 'string' ? fragment : 
-                                (fragment?.content || fragment?.text || fragment?.data || '');
-            if (typeof fragmentText === 'string' && fragmentText.length > 0) {
-              linkCount += (fragmentText.match(/\[\[.*?\]\]/g) || []).length;
-              tagCount += (fragmentText.match(/#\w+/g) || []).length;
-            }
-          });
-        }
-      }).not.toThrow();
+      const { linkCount, tagCount } = processContentSafely(mockResult);
 
       expect(linkCount).toBe(2);
       expect(tagCount).toBe(2);
@@ -110,26 +91,7 @@ describe('vault:read content.match fix', () => {
         content: [] as Fragment[]
       };
 
-      const content = typeof mockResult === 'string' ? mockResult : mockResult?.content || '';
-      
-      let linkCount = 0;
-      let tagCount = 0;
-      
-      expect(() => {
-        if (typeof content === 'string') {
-          linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
-          tagCount = (content.match(/#\w+/g) || []).length;
-        } else if (Array.isArray(content)) {
-          content.forEach((fragment: any) => {
-            const fragmentText = typeof fragment === 'string' ? fragment : 
-                                (fragment?.content || fragment?.text || fragment?.data || '');
-            if (typeof fragmentText === 'string' && fragmentText.length > 0) {
-              linkCount += (fragmentText.match(/\[\[.*?\]\]/g) || []).length;
-              tagCount += (fragmentText.match(/#\w+/g) || []).length;
-            }
-          });
-        }
-      }).not.toThrow();
+      const { linkCount, tagCount } = processContentSafely(mockResult);
 
       expect(linkCount).toBe(0);
       expect(tagCount).toBe(0);
@@ -147,26 +109,7 @@ describe('vault:read content.match fix', () => {
         ]
       };
 
-      const content = typeof mockResult === 'string' ? mockResult : mockResult?.content || '';
-      
-      let linkCount = 0;
-      let tagCount = 0;
-      
-      expect(() => {
-        if (typeof content === 'string') {
-          linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
-          tagCount = (content.match(/#\w+/g) || []).length;
-        } else if (Array.isArray(content)) {
-          content.forEach((fragment: any) => {
-            const fragmentText = typeof fragment === 'string' ? fragment : 
-                                (fragment?.content || fragment?.text || fragment?.data || '');
-            if (typeof fragmentText === 'string' && fragmentText.length > 0) {
-              linkCount += (fragmentText.match(/\[\[.*?\]\]/g) || []).length;
-              tagCount += (fragmentText.match(/#\w+/g) || []).length;
-            }
-          });
-        }
-      }).not.toThrow();
+      const { linkCount, tagCount } = processContentSafely(mockResult);
 
       expect(linkCount).toBe(3); // [[link1]], [[link2]], [[link3]]
       expect(tagCount).toBe(2);  // #tag1, #tag2
@@ -181,23 +124,20 @@ describe('vault:read content.match fix', () => {
         ] as Fragment[]
       };
 
-      const content = typeof mockResult === 'string' ? mockResult : mockResult?.content || '';
+      // Extract content as the old code would have
+      const content = mockResult?.content || '';
       
-      // This is what the OLD code was doing - it would fail
-      expect(() => {
-        // OLD BROKEN CODE (commented out to prevent actual error):
-        // const linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
-        
-        // Instead, verify that content is indeed an array
-        expect(Array.isArray(content)).toBe(true);
-        expect(typeof content).not.toBe('string');
-        
-        // And that calling .match() on it would fail
-        if (Array.isArray(content) && typeof (content as any).match === 'undefined') {
-          // This confirms the bug - arrays don't have .match() method
-          expect(true).toBe(true);
-        }
-      }).not.toThrow(); // Our test itself shouldn't throw
+      // Verify that content is indeed an array (this was the bug)
+      expect(Array.isArray(content)).toBe(true);
+      expect(typeof content).not.toBe('string');
+      
+      // And that calling .match() on it would fail
+      expect(typeof (content as any).match).toBe('undefined');
+      
+      // The new code should handle this gracefully
+      const { linkCount, tagCount } = processContentSafely(mockResult);
+      expect(linkCount).toBe(0);
+      expect(tagCount).toBe(0);
     });
   });
 });
