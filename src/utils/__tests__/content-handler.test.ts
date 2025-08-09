@@ -133,8 +133,17 @@ describe('Content Handler', () => {
     test('provides context for debugging', () => {
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       
+      // Create an array that will cause an error during processing
+      const errorArray = [
+        {
+          get content() {
+            throw new Error('Test error');
+          }
+        }
+      ];
+      
       // This should trigger the error handling
-      countFragmentMatches({ invalid: 'structure' }, /test/, 'test-context');
+      countFragmentMatches(errorArray, /test/, 'test-context');
       
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Fragment match counting failed in test-context'),

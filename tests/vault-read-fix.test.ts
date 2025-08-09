@@ -51,7 +51,7 @@ describe('vault:read content.match fix', () => {
           tagCount = (content.match(/#\w+/g) || []).length;
         } else if (Array.isArray(content)) {
           // Handle Fragment[] - extract content from each fragment
-          content.forEach(fragment => {
+          content.forEach((fragment: any) => {
             const fragmentText = typeof fragment === 'string' ? fragment : 
                                 (fragment?.content || fragment?.text || fragment?.data || '');
             if (typeof fragmentText === 'string' && fragmentText.length > 0) {
@@ -86,7 +86,7 @@ describe('vault:read content.match fix', () => {
           linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
           tagCount = (content.match(/#\w+/g) || []).length;
         } else if (Array.isArray(content)) {
-          content.forEach(fragment => {
+          content.forEach((fragment: any) => {
             const fragmentText = typeof fragment === 'string' ? fragment : 
                                 (fragment?.content || fragment?.text || fragment?.data || '');
             if (typeof fragmentText === 'string' && fragmentText.length > 0) {
@@ -116,7 +116,7 @@ describe('vault:read content.match fix', () => {
           linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
           tagCount = (content.match(/#\w+/g) || []).length;
         } else if (Array.isArray(content)) {
-          content.forEach(fragment => {
+          content.forEach((fragment: any) => {
             const fragmentText = typeof fragment === 'string' ? fragment : 
                                 (fragment?.content || fragment?.text || fragment?.data || '');
             if (typeof fragmentText === 'string' && fragmentText.length > 0) {
@@ -153,7 +153,7 @@ describe('vault:read content.match fix', () => {
           linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
           tagCount = (content.match(/#\w+/g) || []).length;
         } else if (Array.isArray(content)) {
-          content.forEach(fragment => {
+          content.forEach((fragment: any) => {
             const fragmentText = typeof fragment === 'string' ? fragment : 
                                 (fragment?.content || fragment?.text || fragment?.data || '');
             if (typeof fragmentText === 'string' && fragmentText.length > 0) {
@@ -189,7 +189,7 @@ describe('vault:read content.match fix', () => {
         expect(typeof content).not.toBe('string');
         
         // And that calling .match() on it would fail
-        if (Array.isArray(content) && typeof content.match === 'undefined') {
+        if (Array.isArray(content) && typeof (content as any).match === 'undefined') {
           // This confirms the bug - arrays don't have .match() method
           expect(true).toBe(true);
         }
