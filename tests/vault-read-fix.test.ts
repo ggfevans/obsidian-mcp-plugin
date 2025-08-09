@@ -5,6 +5,31 @@
 
 import { Fragment } from '../src/types/fragment';
 
+// Helper function that replicates the fixed logic from router.ts
+function processContentSafely(result: any): { linkCount: number; tagCount: number } {
+  const content = typeof result === 'string' ? result : result?.content || '';
+  
+  let linkCount = 0;
+  let tagCount = 0;
+  
+  if (typeof content === 'string') {
+    linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
+    tagCount = (content.match(/#\w+/g) || []).length;
+  } else if (Array.isArray(content)) {
+    // Handle Fragment[] - extract content from each fragment
+    content.forEach((fragment: any) => {
+      const fragmentText = typeof fragment === 'string' ? fragment : 
+                          (fragment?.content || fragment?.text || fragment?.data || '');
+      if (typeof fragmentText === 'string' && fragmentText.length > 0) {
+        linkCount += (fragmentText.match(/\[\[.*?\]\]/g) || []).length;
+        tagCount += (fragmentText.match(/#\w+/g) || []).length;
+      }
+    });
+  }
+  
+  return { linkCount, tagCount };
+}
+
 describe('vault:read content.match fix', () => {
   describe('Fragment array handling', () => {
     test('should handle Fragment array without throwing content.match error', () => {
@@ -38,29 +63,8 @@ describe('vault:read content.match fix', () => {
         }
       };
 
-      // This is the exact logic from router.ts that was failing
-      const content = typeof mockResult === 'string' ? mockResult : mockResult?.content || '';
-      
-      let linkCount = 0;
-      let tagCount = 0;
-      
       // This should NOT throw "content.match is not a function" error
-      expect(() => {
-        if (typeof content === 'string') {
-          linkCount = (content.match(/\[\[.*?\]\]/g) || []).length;
-          tagCount = (content.match(/#\w+/g) || []).length;
-        } else if (Array.isArray(content)) {
-          // Handle Fragment[] - extract content from each fragment
-          content.forEach((fragment: any) => {
-            const fragmentText = typeof fragment === 'string' ? fragment : 
-                                (fragment?.content || fragment?.text || fragment?.data || '');
-            if (typeof fragmentText === 'string' && fragmentText.length > 0) {
-              linkCount += (fragmentText.match(/\[\[.*?\]\]/g) || []).length;
-              tagCount += (fragmentText.match(/#\w+/g) || []).length;
-            }
-          });
-        }
-      }).not.toThrow();
+      const { linkCount, tagCount } = processContentSafely(mockResult);
 
       // Verify correct counts
       expect(linkCount).toBe(3); // [[link1]], [[link2]], [[link3]]
