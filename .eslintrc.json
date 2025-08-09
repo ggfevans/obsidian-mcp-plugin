@@ -31,20 +31,6 @@
       "rules": {
         "no-unused-vars": "off"
       }
-    },
-    {
-      "files": ["**/__tests__/**/*.ts", "**/*.test.ts", "**/tests/**/*.ts"],
-      "env": {
-        "jest": true
-      },
-      "parser": "@typescript-eslint/parser",
-      "parserOptions": {
-        "ecmaVersion": 2020,
-        "sourceType": "module"
-      },
-      "rules": {
-        "no-unused-vars": "off"
-      }
     }
   ]
 }
